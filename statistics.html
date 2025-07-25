@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Statistiche Attività</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body { font-family: Arial; padding: 12px; }
+    input, button { margin: 4px; padding: 6px; font-size: 16px; }
+    table { border-collapse: collapse; width: 100%; margin-top: 12px; }
+    th, td { border: 1px solid #aaa; padding: 5px 8px; }
+    th { background: #eee; }
+    canvas { max-width: 100%; }
+  </style>
+</head>
+<body>
+  <h2>📊 Statistiche Giornaliere</h2>
+  <button onclick="calcolaPercentualiPerData()">Mostra Statistiche Oggi</button>
+  Cambia data: <input type="date" id="statsDate">
+  <div>
+    <button onclick="calcolaPercentualiPerData('all')">TUTTE</button>
+    <button onclick="calcolaPercentualiPerData('free')">Solo tempo gestibile</button>
+  </div>
+  <div id="statsResult"></div>
+  <canvas id="statsPie" width="320" height="200"></canvas>
+
+  <hr>
+  <h2>🗕️ Statistiche Settimanali</h2>
+  Dal: <input type="date" id="weekStart">
+  Al: <input type="date" id="weekEnd">
+  <div>
+    <button onclick="calcolaPercentualiSettimana('all')">TUTTE</button>
+    <button onclick="calcolaPercentualiSettimana('free')">Solo tempo gestibile</button>
+  </div>
+  <div id="weekStatsResult"></div>
+  <canvas id="weekStatsPie" width="320" height="200"></canvas>
+
+  <script>
+    const NON_LIBERI = ["Survive", "Sleep", "Work", "Slavery"];
+  </script>
+  <script src="app-statistics.js"></script>
+</body>
+</html>
