@@ -1,6 +1,5 @@
 const CACHE_NAME = 'time-tracker-cache-v1';
 const FILES_TO_CACHE = [
-  '/',
   '/index.html',
   '/statistics.html',
   '/manifest.json',
