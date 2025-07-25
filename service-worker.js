@@ -1,12 +1,12 @@
 const CACHE_NAME = 'time-tracker-cache-v1';
 const FILES_TO_CACHE = [
-  '/index.html',
-  '/statistics.html',
-  '/manifest.json',
-  '/app.js',
-  '/app-statistics.js',
-  '/icon-192.png',
-  '/icon-512.png'
+  'index.html',
+  'statistics.html',
+  'manifest.json',
+  'app.js',
+  'app-statistics.js',
+  'icon-192.png',
+  'icon-512.png'
 ];
 
 self.addEventListener('install', event => {
