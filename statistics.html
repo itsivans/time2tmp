@@ -3,6 +3,8 @@
 <head>
   <title>Statistiche Attività</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="icon" href="icon-192.png">
+  <meta name="theme-color" content="#2196f3">
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -13,6 +15,18 @@
     th, td { border: 1px solid #aaa; padding: 5px 8px; }
     th { background: #eee; }
     canvas { max-width: 100%; }
+    .tag { background: #eee; border-radius: 5px; padding: 2px 7px; margin-right: 5px; }
+    .link-btn {
+      display: block;
+      margin-top: 20px;
+      padding: 12px;
+      background: #2196f3;
+      color: white;
+      text-align: center;
+      border-radius: 6px;
+      text-decoration: none;
+      font-weight: bold;
+    }
   </style>
 </head>
 <body>
@@ -37,9 +51,54 @@
   <div id="weekStatsResult"></div>
   <canvas id="weekStatsPie" width="320" height="200"></canvas>
 
+  <hr>
+  <h2>📋 Tutte le attività</h2>
+  <table id="activityTable">
+    <thead>
+      <tr>
+        <th>Data</th><th>Ora</th><th>Tag</th><th>Attività</th>
+      </tr>
+    </thead>
+    <tbody id="activityList"></tbody>
+  </table>
+
+  <a href="index.html" class="link-btn">📥 Torna all'inserimento</a>
+
   <script>
     const NON_LIBERI = ["Survive", "Sleep", "Work", "Slavery"];
   </script>
   <script src="app-statistics.js"></script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('service-worker.js')
+        .then(() => console.log('✅ Service Worker registrato'))
+        .catch(err => console.error('❌ SW errore:', err));
+    }
+
+    const db = firebase.firestore();
+    function loadActivitiesList() {
+      db.collection("activities")
+        .orderBy("timestamp", "desc")
+        .get()
+        .then(snapshot => {
+          const activityList = document.getElementById('activityList');
+          activityList.innerHTML = '';
+          snapshot.forEach(doc => {
+            const data = doc.data();
+            const dt = new Date(data.timestamp);
+            const localDate = dt.toLocaleDateString('it-IT', { timeZone: 'Europe/Rome' });
+            const localTime = dt.toLocaleTimeString('it-IT', { timeZone: 'Europe/Rome', hour12: false });
+            activityList.innerHTML += `
+              <tr>
+                <td>${localDate}</td>
+                <td>${localTime}</td>
+                <td><span class="tag">${data.tag || 'Nessun tag'}</span></td>
+                <td>${data.activity || ''}</td>
+              </tr>`;
+          });
+        });
+    }
+    window.onload = loadActivitiesList;
+  </script>
 </body>
 </html>
