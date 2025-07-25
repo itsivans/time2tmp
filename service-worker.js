@@ -1,4 +1,3 @@
-
 const CACHE_NAME = 'time-tracker-cache-v1';
 const FILES_TO_CACHE = [
   '/',
@@ -25,11 +24,9 @@ self.addEventListener('install', event => {
 
 self.addEventListener('activate', event => {
   event.waitUntil(
-    caches.keys().then(keyList => {
-      return Promise.all(keyList.map(key => {
-        if (key !== CACHE_NAME) {
-          return caches.delete(key);
-        }
+    caches.keys().then(keys => {
+      return Promise.all(keys.map(key => {
+        if (key !== CACHE_NAME) return caches.delete(key);
       }));
     })
   );
