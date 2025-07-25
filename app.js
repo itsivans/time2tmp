@@ -73,7 +73,7 @@ function loadActivities() {
     });
   });
 }
-window.onload = loadActivities;
+// window.onload = loadActivities;
 
 function deleteActivity(id) {
   db.collection("activities").doc(id).delete().then(loadActivities);
