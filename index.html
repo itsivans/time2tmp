@@ -4,22 +4,32 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Activity Tracker</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" href="icon-192.png">
+  <meta name="theme-color" content="#2196f3">
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
-    body { font-family: Arial; }
-    table { border-collapse: collapse; width: 100%; margin-top: 12px; }
-    th, td { border: 1px solid #aaa; padding: 5px 8px; }
-    th { background: #eee; }
-    .tag { background: #eee; border-radius: 5px; padding: 2px 7px; margin-right: 5px; }
-    .actions button { margin-right: 2px; }
-    #statsSection, #weekStatsSection { margin-top: 32px; }
-    #editForm { margin-top:16px; background: #f5f5f5; padding: 8px; border-radius: 8px; }
+    body { font-family: Arial; margin: 12px; padding: 0; }
+    input, select, button {
+      width: 100%;
+      padding: 12px;
+      margin: 6px 0;
+      font-size: 16px;
+      box-sizing: border-box;
+    }
+    button.link {
+      background: #2196f3;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      margin-top: 16px;
+      font-weight: bold;
+    }
   </style>
 </head>
 <body>
-  <h2>Traccia le tue attività</h2>
+  <h2>📥 Inserisci attività</h2>
   <input type="text" id="activity" placeholder="Attività...">
   <input type="datetime-local" id="dateTime">
   <select id="tag">
@@ -40,45 +50,18 @@
     <option>Sleep</option>
     <option>Book</option>
   </select>
-  <button onclick="addActivity()">Aggiungi</button>
+  <button onclick="addActivity()">➕ Aggiungi</button>
 
-  <table id="activityTable">
-    <thead>
-      <tr>
-        <th>Data</th><th>Ora</th><th>Tag</th><th>Attività</th><th>Azioni</th>
-      </tr>
-    </thead>
-    <tbody id="activityList"></tbody>
-  </table>
-
-  <!-- Form di modifica (nascosto di default) -->
-  <div id="editForm" style="display:none;">
-    <input type="text" id="editActivity" placeholder="Nuova attività">
-    <input type="datetime-local" id="editDateTime">
-    <select id="editTag">
-      <option value="">--Tag--</option>
-      <option>Entertainment</option>
-      <option>Survive</option>
-      <option>Study</option>
-      <option>Work</option>
-      <option>Nut</option>
-      <option>Slavery</option>
-      <option>Productivity</option>
-      <option>Waste</option>
-      <option>Chess</option>
-      <option>Gym</option>
-      <option>Bike</option>
-      <option>Holiday</option>
-      <option>Chinese</option>
-      <option>Sleep</option>
-      <option>Book</option>
-    </select>
-    <button onclick="saveEdit()">Salva</button>
-    <button onclick="cancelEdit()">Annulla</button>
-  </div>
-
-  <a href="statistics.html">Vai alla pagina delle statistiche</a>
+  <!-- Bottone per passare alle statistiche -->
+  <a href="statistics.html"><button class="link">📊 Vai alle statistiche</button></a>
 
   <script src="app.js"></script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('service-worker.js')
+        .then(() => console.log('✅ Service Worker registrato'))
+        .catch(err => console.error('❌ SW errore:', err));
+    }
+  </script>
 </body>
 </html>
