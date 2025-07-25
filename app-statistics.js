@@ -13,10 +13,9 @@ const db = firebase.firestore();
 
 let statsPieChart = null, weekPieChart = null;
 
-// NON gestibili
 const NON_LIBERI = ["Survive", "Sleep", "Work", "Slavery"];
 
-// -------- GIORNALIERE --------
+// ----------- GIORNALIERE -----------
 function calcolaPercentualiPerData(filtro = "all") {
   let dataYYYYMMDD = document.getElementById('statsDate').value;
   if (!dataYYYYMMDD) {
@@ -105,7 +104,7 @@ function calcolaPercentualiPerData(filtro = "all") {
     });
 }
 
-// -------- SETTIMANALI --------
+// ----------- SETTIMANALI -----------
 function calcolaPercentualiSettimana(filtro = "all") {
   let start = document.getElementById('weekStart').value;
   let end = document.getElementById('weekEnd').value;
