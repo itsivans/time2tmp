@@ -8,9 +8,6 @@ const FILES_TO_CACHE = [
   '/app-statistics.js',
   '/icon-192.png',
   '/icon-512.png',
-  'https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js',
-  'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js',
-  'https://cdn.jsdelivr.net/npm/chart.js'
 ];
 
 self.addEventListener('install', event => {
