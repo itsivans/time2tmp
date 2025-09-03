@@ -2,12 +2,8 @@
 <html lang="it">
 <head>
   <meta charset="utf-8" />
-  <title>Time Tracker — Backup</title>
+  <title>Time Tracker — Backup (modular)</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <!-- Firebase (compat) -->
-  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
   <style>
     body { font-family: system-ui, Arial; margin: 20px; }
     .row { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin:8px 0; }
@@ -15,24 +11,32 @@
     button { cursor:pointer; }
     .primary { background:#1e88e5; color:#fff; border:none; border-radius:6px; }
     .secondary { background:#eee; border:1px solid #ccc; border-radius:6px; }
-    .danger { background:#e53935; color:#fff; border:none; border-radius:6px; }
     #log { white-space:pre-wrap; font-size:13px; background:#fafafa; border:1px solid #eee; padding:10px; border-radius:8px; }
     small.mono { font-family: ui-monospace, Menlo, Consolas, monospace; color:#555; }
   </style>
 </head>
 <body>
   <h1>🧰 Backup dati — Time Tracker</h1>
-  <p>Strumento separato per esportare i tuoi dati senza toccare i file dell’app.</p>
+  <p>Strumento separato per esportare dati. Se i bottoni non fanno nulla, guarda il log qui sotto.</p>
 
-  <h3>1) Accesso (Email/Password)</h3>
+  <h3>Debug</h3>
+  <div class="row">
+    <button id="btnPing" class="secondary">Ping</button>
+    <span id="sdkInfo"></span>
+  </div>
+
+  <h3>1) Accesso</h3>
   <div class="row">
     <input id="email" type="email" placeholder="Email" />
     <input id="password" type="password" placeholder="Password" />
     <button id="btnSignIn" class="secondary">Accedi</button>
     <button id="btnSignUp" class="secondary">Registrati</button>
     <button id="btnReset" class="secondary">Reset password</button>
+    <button id="btnAnon" class="secondary" title="Richiede Anonymous abilitato">Accedi ospite</button>
     <button id="btnOut" class="secondary" hidden>Esci</button>
-    <span id="userInfo" class="row"></span>
+  </div>
+  <div class="row">
+    <strong>Utente:</strong> <span id="userInfo">Non autenticato</span>
   </div>
 
   <h3>2) Esporta</h3>
@@ -41,14 +45,24 @@
     <button id="btnExportUser" class="secondary" title="Dati sotto users/{uid}/… (richiede login)">Export mio spazio utente</button>
     <button id="btnExportAll" class="primary" title="Legacy + users/{uid}/… in un file">Export TUTTO</button>
   </div>
-  <p><small class="mono">Collezioni incluse (modificabili nel codice): <span id="colsLabel"></span></small></p>
+  <p><small class="mono">Collezioni incluse: <span id="colsLabel"></span></small></p>
 
   <h3>Log</h3>
   <pre id="log"></pre>
 
-  <script>
-    // ---------- CONFIG ----------
-    // Incolla qui la tua config (Project settings → SDK setup and configuration)
+  <script type="module">
+    // ======== Import SDK (modulare) ========
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+    import {
+      getFirestore, collection, getDocs
+    } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+    import {
+      getAuth, onAuthStateChanged,
+      signInWithEmailAndPassword, createUserWithEmailAndPassword,
+      sendPasswordResetEmail, signOut, signInAnonymously
+    } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+
+    // ======== Config ========
     const firebaseConfig = {
       apiKey: "AIzaSyDEq8aUhdBPcjYM6H6909DldXAdjhRNWbI",
       authDomain: "time-ff7ed.firebaseapp.com",
@@ -59,24 +73,33 @@
       measurementId: "G-ZR0BNWGVXJ"
     };
 
-    // Collezioni legacy (adatta se i nomi differiscono)
     const COLLECTIONS = ["activities","entries","tags"];
 
-    // ---------- INIT ----------
-    if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
-    const db = firebase.firestore();
-    const auth = firebase.auth();
-
-    // ---------- UTILS ----------
-    const $ = (id) => document.getElementById(id);
-    const log = (m) => { $("log").textContent += m + "\n"; console.log(m); };
+    // ======== Helpers UI / Log ========
+    const $ = (id)=>document.getElementById(id);
+    const log = (m)=>{ $("log").textContent += m + "\\n"; console.log(m); };
     $("colsLabel").textContent = COLLECTIONS.join(", ");
 
+    // Logga qualsiasi errore JS a schermo
+    window.onerror = (msg, src, line, col, err) => {
+      log("❌ JS error: " + msg + " @ " + src + ":" + line + ":" + col);
+      if (err && err.stack) log(err.stack);
+    };
+    window.onunhandledrejection = (e) => {
+      log("❌ Unhandled promise: " + (e.reason?.message || e.reason || e));
+    };
+
+    // ======== Init Firebase ========
+    const app = initializeApp(firebaseConfig);
+    const db  = getFirestore(app);
+    const auth = getAuth(app);
+    $("sdkInfo").textContent = "SDK ok";
+
+    // ======== Core functions ========
     async function dumpCollection(colRef) {
-      const snap = await colRef.get();
+      const snap = await getDocs(colRef);
       return snap.docs.map(d => ({ id: d.id, data: d.data() }));
     }
-
     function downloadJSON(filename, obj) {
       const blob = new Blob([JSON.stringify(obj, null, 2)], { type: "application/json" });
       const a = document.createElement("a");
@@ -85,58 +108,57 @@
       document.body.appendChild(a); a.click(); a.remove();
       URL.revokeObjectURL(a.href);
     }
+    const ts = () => new Date().toISOString().replace(/[:.]/g,"-");
 
-    function tsSuffix() {
-      return new Date().toISOString().replace(/[:.]/g,"-");
-    }
-
-    // ---------- AUTH: Email/Password ----------
-    function uiVals() {
-      return {
-        email: $("email").value.trim(),
-        password: $("password").value
-      };
-    }
-
+    // ======== Auth actions ========
     async function signInEmail() {
-      const {email, password} = uiVals();
-      await auth.signInWithEmailAndPassword(email, password);
+      const email = $("email").value.trim();
+      const password = $("password").value;
+      await signInWithEmailAndPassword(auth, email, password);
       log("✅ Login eseguito.");
     }
     async function signUpEmail() {
-      const {email, password} = uiVals();
-      await auth.createUserWithEmailAndPassword(email, password);
-      try { await auth.currentUser.sendEmailVerification(); } catch {}
-      log("✅ Registrazione completata (email di verifica inviata).");
+      const email = $("email").value.trim();
+      const password = $("password").value;
+      await createUserWithEmailAndPassword(auth, email, password);
+      log("✅ Registrazione completata.");
     }
     async function resetPassword() {
-      const {email} = uiVals();
+      const email = $("email").value.trim();
       if (!email) throw new Error("Inserisci l'email per il reset.");
-      await auth.sendPasswordResetEmail(email);
+      await sendPasswordResetEmail(auth, email);
       log("📧 Email di reset inviata.");
     }
-    async function signOutAll() {
-      await auth.signOut();
-      log("🚪 Logout eseguito.");
+    function signOutAll() { return signOut(auth).then(()=>log("🚪 Logout eseguito.")); }
+    async function signInGuest() {
+      // Richiede che "Anonymous" sia abilitato in Authentication → Sign-in method
+      await signInAnonymously(auth);
+      log("👤 Login ospite eseguito.");
     }
 
-    auth.onAuthStateChanged((user) => {
+    onAuthStateChanged(auth, (user) => {
       $("btnOut").hidden = !user;
       $("userInfo").textContent = user
-        ? (user.isAnonymous ? "Ospite" : (user.email || user.uid))
+        ? (user.isAnonymous ? "Ospite (uid: "+user.uid+")" : (user.email || user.uid))
         : "Non autenticato";
     });
 
-    // ---------- EXPORT ----------
+    // ======== Export actions ========
     async function exportLegacy() {
       log("== Export legacy ==");
       const out = { meta: { exportedAt: new Date().toISOString(), scope: "legacy", collections: COLLECTIONS }, docs: {} };
       for (const name of COLLECTIONS) {
-        const arr = await dumpCollection(db.collection(name));
-        out.docs[name] = arr;
-        log(`• ${name}: ${arr.length} doc`);
+        try {
+          const arr = await dumpCollection(collection(db, name));
+          out.docs[name] = arr;
+          log(`• ${name}: ${arr.length} doc`);
+        } catch (e) {
+          log(`❌ ${name}: ${e.message||e}`);
+          log("Suggerimento: controlla le Firestore Rules (serve allow read per utenti autenticati o pubblico).");
+          throw e;
+        }
       }
-      const file = `tt-backup-legacy-${tsSuffix()}.json`;
+      const file = `tt-backup-legacy-${ts()}.json`;
       downloadJSON(file, out);
       log("✅ Export legacy completato → " + file);
     }
@@ -147,18 +169,18 @@
       log(`== Export spazio utente (${u.uid}) ==`);
       const out = { meta: { exportedAt: new Date().toISOString(), scope: `user:${u.uid}`, collections: COLLECTIONS }, docs: {} };
       for (const name of COLLECTIONS) {
-        const arr = await dumpCollection(db.collection(`users/${u.uid}/${name}`));
+        const arr = await dumpCollection(collection(db, `users/${u.uid}/${name}`));
         out.docs[name] = arr;
         log(`• ${name}: ${arr.length} doc`);
       }
-      const file = `tt-backup-user-${u.uid}-${tsSuffix()}.json`;
+      const file = `tt-backup-user-${u.uid}-${ts()}.json`;
       downloadJSON(file, out);
       log("✅ Export user completato → " + file);
     }
 
     async function exportAll() {
       const u = auth.currentUser;
-      log("== Export TUTTO (legacy + eventuale spazio utente) ==");
+      log("== Export TUTTO ==");
       const out = {
         meta: {
           exportedAt: new Date().toISOString(),
@@ -169,37 +191,4 @@
         legacy: {}, user: null
       };
       // Legacy
-      for (const name of COLLECTIONS) {
-        const arr = await dumpCollection(db.collection(name));
-        out.legacy[name] = arr;
-        log(`• Legacy ${name}: ${arr.length} doc`);
-      }
-      // User (se loggato non-ospite)
-      if (u && !u.isAnonymous) {
-        out.user = { uid: u.uid, collections: {} };
-        for (const name of COLLECTIONS) {
-          const arr = await dumpCollection(db.collection(`users/${u.uid}/${name}`));
-          out.user.collections[name] = arr;
-          log(`• User ${name}: ${arr.length} doc`);
-        }
-      } else {
-        log("ℹ️ Non sei loggato: l'export include solo il legacy.");
-      }
-      const suffix = out.user ? `uid-${out.user.uid}` : "legacy-only";
-      const file = `tt-export-all-${suffix}-${tsSuffix()}.json`;
-      downloadJSON(file, out);
-      log("✅ Export TUTTO completato → " + file);
-    }
-
-    // ---------- WIRING ----------
-    $("btnSignIn").onclick = ()=>signInEmail().catch(e=>log("Errore login: "+e.message));
-    $("btnSignUp").onclick = ()=>signUpEmail().catch(e=>log("Errore registrazione: "+e.message));
-    $("btnReset").onclick  = ()=>resetPassword().catch(e=>log("Errore reset: "+e.message));
-    $("btnOut").onclick    = ()=>signOutAll().catch(e=>log("Errore logout: "+e.message));
-
-    $("btnExportLegacy").onclick = ()=>exportLegacy().catch(e=>log("Export legacy: "+e.message));
-    $("btnExportUser").onclick   = ()=>exportUser().catch(e=>log("Export user: "+e.message));
-    $("btnExportAll").onclick    = ()=>exportAll().catch(e=>log("Export tutto: "+e.message));
-  </script>
-</body>
-</html>
+      for (const nam
