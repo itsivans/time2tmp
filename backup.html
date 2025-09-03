@@ -17,7 +17,7 @@
 </head>
 <body>
   <h1>🧰 Backup dati — Time Tracker</h1>
-  <p>Strumento separato per esportare dati. Se i bottoni non fanno nulla, guarda il log qui sotto.</p>
+  <p>Strumento separato per esportare i dati da Firestore. Se i bottoni non fanno nulla, guarda il log qui sotto.</p>
 
   <h3>Debug</h3>
   <div class="row">
@@ -73,11 +73,12 @@
       measurementId: "G-ZR0BNWGVXJ"
     };
 
+    // Collezioni che vuoi esportare
     const COLLECTIONS = ["activities","entries","tags"];
 
     // ======== Helpers UI / Log ========
     const $ = (id)=>document.getElementById(id);
-    const log = (m)=>{ $("log").textContent += m + "\\n"; console.log(m); };
+    const log = (m)=>{ $("log").textContent += m + "\n"; console.log(m); };
     $("colsLabel").textContent = COLLECTIONS.join(", ");
 
     // Logga qualsiasi errore JS a schermo
@@ -129,9 +130,10 @@
       await sendPasswordResetEmail(auth, email);
       log("📧 Email di reset inviata.");
     }
-    function signOutAll() { return signOut(auth).then(()=>log("🚪 Logout eseguito.")); }
+    function signOutAll() {
+      return signOut(auth).then(()=>log("🚪 Logout eseguito."));
+    }
     async function signInGuest() {
-      // Richiede che "Anonymous" sia abilitato in Authentication → Sign-in method
       await signInAnonymously(auth);
       log("👤 Login ospite eseguito.");
     }
@@ -190,5 +192,76 @@
         },
         legacy: {}, user: null
       };
+
       // Legacy
-      for (const nam
+      for (const name of COLLECTIONS) {
+        try {
+          const arr = await dumpCollection(collection(db, name));
+          out.legacy[name] = arr;
+          log(`• legacy/${name}: ${arr.length} doc`);
+        } catch (e) {
+          log(`⚠️ legacy/${name}: ${e.message||e}`);
+          log("Nota: se le rules bloccano, l'export legacy può fallire. Procedo comunque.");
+          out.legacy[name] = { error: String(e) };
+        }
+      }
+
+      // User (se loggato non anonimo)
+      if (u && !u.isAnonymous) {
+        out.user = { uid: u.uid, docs: {} };
+        for (const name of COLLECTIONS) {
+          try {
+            const arr = await dumpCollection(collection(db, `users/${u.uid}/${name}`));
+            out.user.docs[name] = arr;
+            log(`• user/${u.uid}/${name}: ${arr.length} doc`);
+          } catch (e) {
+            log(`⚠️ user/${u.uid}/${name}: ${e.message||e}`);
+            out.user.docs[name] = { error: String(e) };
+          }
+        }
+      } else {
+        log("ℹ️ Non autenticato con email/password: salto export user.");
+      }
+
+      const file = `tt-backup-all-${out.meta.userUid || "noauth"}-${ts()}.json`;
+      downloadJSON(file, out);
+      log("✅ Export TUTTO completato → " + file);
+    }
+
+    // ======== Wire up UI events ========
+    function bind(id, fn) {
+      const el = $(id);
+      if (!el) { log(`❌ Manca elemento #${id}`); return; }
+      el.addEventListener("click", async () => {
+        try { await fn(); }
+        catch (e) { log(`❌ ${id}: ${e?.message || e}`); }
+      });
+    }
+
+    // Ping (verifica runtime + Firestore)
+    bind("btnPing", async () => {
+      log("🟢 Ping ok.");
+      log("Auth currentUser: " + (auth.currentUser ? (auth.currentUser.email || auth.currentUser.uid) : "null"));
+      try {
+        await getDocs(collection(db, "_non_esiste_per_test_"));
+        log("Firestore getDocs eseguito (collezione di test).");
+      } catch (e) {
+        log("Firestore operativo. (Errore atteso: la collezione non esiste)");
+      }
+      log("Suggerimento: apri questo file via http:// (non file://). Es. `npx serve` o `python -m http.server`");
+    });
+
+    // Auth
+    bind("btnSignIn",  signInEmail);
+    bind("btnSignUp",  signUpEmail);
+    bind("btnReset",   resetPassword);
+    bind("btnAnon",    signInGuest);
+    bind("btnOut",     signOutAll);
+
+    // Export
+    bind("btnExportLegacy", exportLegacy);
+    bind("btnExportUser",   exportUser);
+    bind("btnExportAll",    exportAll);
+  </script>
+</body>
+</html>
