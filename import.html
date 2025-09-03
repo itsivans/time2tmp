@@ -1,0 +1,386 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8" />
+  <title>Time Tracker — Import (modular)</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    body { font-family: system-ui, Arial; margin: 20px; }
+    .row { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin:8px 0; }
+    input, button, select, label { padding:10px; font-size:15px; }
+    button { cursor:pointer; }
+    .primary { background:#2e7d32; color:#fff; border:none; border-radius:6px; }
+    .secondary { background:#eee; border:1px solid #ccc; border-radius:6px; }
+    .danger { background:#c62828; color:#fff; border:none; border-radius:6px; }
+    #log { white-space:pre-wrap; font-size:13px; background:#fafafa; border:1px solid #eee; padding:10px; border-radius:8px; max-height:50vh; overflow:auto; }
+    small.mono { font-family: ui-monospace, Menlo, Consolas, monospace; color:#555; }
+    .muted { color:#666; }
+  </style>
+</head>
+<body>
+  <h1>📥 Import dati — Time Tracker</h1>
+  <p class="muted">Ripristina i dati da un file di backup generato con <em>backup.html</em>. Default sicuro: <strong>merge non distruttivo</strong>.</p>
+
+  <h3>Debug / SDK</h3>
+  <div class="row">
+    <button id="btnPing" class="secondary">Ping</button>
+    <span id="sdkInfo"></span>
+  </div>
+
+  <h3>1) Accesso</h3>
+  <div class="row">
+    <input id="email" type="email" placeholder="Email" />
+    <input id="password" type="password" placeholder="Password" />
+    <button id="btnSignIn" class="secondary">Accedi</button>
+    <button id="btnSignUp" class="secondary">Registrati</button>
+    <button id="btnReset" class="secondary">Reset password</button>
+    <button id="btnAnon" class="secondary" title="Richiede Anonymous abilitato">Accedi ospite</button>
+    <button id="btnOut" class="secondary" hidden>Esci</button>
+  </div>
+  <div class="row">
+    <strong>Utente:</strong> <span id="userInfo">Non autenticato</span>
+  </div>
+
+  <h3>2) File di backup</h3>
+  <div class="row">
+    <input id="fileInput" type="file" accept=".json,application/json" />
+    <button id="btnInspect" class="secondary">Analizza file</button>
+  </div>
+  <p><small class="mono">Collezioni attese: <span id="colsLabel"></span></small></p>
+  <div id="fileMeta" class="muted"></div>
+
+  <h3>3) Target & Opzioni</h3>
+  <div class="row">
+    <label><input type="checkbox" id="chkLegacy" checked /> Import legacy (root)</label>
+    <label><input type="checkbox" id="chkUser" checked /> Import spazio utente</label>
+  </div>
+  <div class="row">
+    <label><input type="checkbox" id="chkDryRun" /> Dry-run (simula, nessuna scrittura)</label>
+    <label><input type="checkbox" id="chkMerge" checked /> Merge non distruttivo (consigliato)</label>
+  </div>
+  <div class="row">
+    <label title="Per import user: se blank, usa uid del backup (se presente) oppure dell'utente autenticato.">
+      UID destinazione: <input id="targetUid" type="text" placeholder="(vuoto = auto)" style="min-width:260px" />
+    </label>
+  </div>
+  <div class="row">
+    <button id="btnImport" class="primary">Importa</button>
+  </div>
+  <p class="muted">⚠️ Per import “legacy” potresti dover abilitare le <em>write</em> nelle Firestore Rules delle collezioni root. Per lo spazio utente devi essere autenticato come <code>uid</code> di destinazione.</p>
+
+  <h3>Log</h3>
+  <pre id="log"></pre>
+
+  <script type="module">
+    // ======== Helpers UI / Log ========
+    const $ = (id)=>document.getElementById(id);
+    const log = (m)=>{ $("log").textContent += m + "\\n"; console.log(m); };
+    log("⏳ Caricamento import…");
+
+    window.onerror = (msg, src, line, col, err) => {
+      log("❌ JS error: " + msg + " @ " + src + ":" + line + ":" + col);
+      if (err && err.stack) log(err.stack);
+    };
+    window.onunhandledrejection = (e) => {
+      log("❌ Unhandled promise: " + (e.reason?.message || e.reason || e));
+    };
+
+    // ======== Firebase SDK (modulare) ========
+    import { initializeApp, getApps } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+    import {
+      getFirestore, collection, doc, setDoc, writeBatch, getDocs
+    } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+    import {
+      getAuth, onAuthStateChanged,
+      signInWithEmailAndPassword, createUserWithEmailAndPassword,
+      sendPasswordResetEmail, signOut, signInAnonymously
+    } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyDEq8aUhdBPcjYM6H6909DldXAdjhRNWbI",
+      authDomain: "time-ff7ed.firebaseapp.com",
+      projectId: "time-ff7ed",
+      storageBucket: "time-ff7ed.appspot.com",
+      messagingSenderId: "842285944784",
+      appId: "1:842285944784:web:de483548153abc956033d5",
+      measurementId: "G-ZR0BNWGVXJ"
+    };
+
+    const COLLECTIONS = ["activities","entries","tags"];
+    $("colsLabel").textContent = COLLECTIONS.join(", ");
+
+    // ======== Init ========
+    const app = getApps()[0] || initializeApp(firebaseConfig);
+    const db  = getFirestore(app);
+    const auth = getAuth(app);
+    $("sdkInfo").textContent = "SDK ok";
+
+    const host = location.hostname;
+    log("🌐 Host: " + host);
+    if (/github\.io$/.test(host)) {
+      log("ℹ️ GitHub Pages: verifica 'Authorized domains' in Firebase Auth.");
+    }
+
+    // ======== Auth ========
+    async function signInEmail() {
+      const email = $("email").value.trim();
+      const password = $("password").value;
+      await signInWithEmailAndPassword(auth, email, password);
+      log("✅ Login eseguito.");
+    }
+    async function signUpEmail() {
+      const email = $("email").value.trim();
+      const password = $("password").value;
+      await createUserWithEmailAndPassword(auth, email, password);
+      log("✅ Registrazione completata.");
+    }
+    async function resetPassword() {
+      const email = $("email").value.trim();
+      if (!email) throw new Error("Inserisci l'email per il reset.");
+      await sendPasswordResetEmail(auth, email);
+      log("📧 Email di reset inviata.");
+    }
+    function signOutAll() {
+      return signOut(auth).then(()=>log("🚪 Logout eseguito."));
+    }
+    async function signInGuest() {
+      await signInAnonymously(auth);
+      log("👤 Login ospite eseguito.");
+    }
+
+    onAuthStateChanged(auth, (user) => {
+      $("btnOut").hidden = !user;
+      $("userInfo").textContent = user
+        ? (user.isAnonymous ? "Ospite (uid: "+user.uid+")" : (user.email || user.uid))
+        : "Non autenticato";
+    });
+
+    // ======== File handling ========
+    let parsed = null;
+
+    function readFileAsJSON(file) {
+      return new Promise((resolve, reject) => {
+        const fr = new FileReader();
+        fr.onload = () => {
+          try { resolve(JSON.parse(fr.result)); }
+          catch (e) { reject(e); }
+        };
+        fr.onerror = reject;
+        fr.readAsText(file, 'utf-8');
+      });
+    }
+
+    function detectBackupStructure(obj) {
+      // Riconosce i 3 tipi: legacy, user, all
+      if (obj?.meta?.scope === "legacy" && obj?.docs) return { type: "legacy", collections: obj.meta.collections || [] };
+      if (typeof obj?.meta?.scope === "string" && obj?.meta?.scope.startsWith("user:") && obj?.docs) {
+        return { type: "user", uid: obj.meta.scope.split(":")[1], collections: obj.meta.collections || [] };
+      }
+      if (obj?.legacy || obj?.user) {
+        return { type: "all", uid: obj?.user?.uid || obj?.meta?.userUid || null, collections: obj?.meta?.collections || [] };
+      }
+      return { type: "unknown" };
+    }
+
+    function summarizeFile(obj) {
+      const det = detectBackupStructure(obj);
+      const cols = (det.collections && det.collections.length) ? det.collections.join(", ") : "(sconosciute)";
+      let lines = [];
+      lines.push("📄 Tipo backup: " + det.type);
+      if (det.uid) lines.push("🔐 UID nel backup: " + det.uid);
+      lines.push("📚 Collezioni: " + cols);
+
+      if (det.type === "legacy") {
+        for (const c of Object.keys(obj.docs||{})) lines.push(`• legacy ${c}: ${(obj.docs[c]||[]).length} doc`);
+      } else if (det.type === "user") {
+        for (const c of Object.keys(obj.docs||{})) lines.push(`• user ${c}: ${(obj.docs[c]||[]).length} doc`);
+      } else if (det.type === "all") {
+        if (obj.legacy) for (const c of Object.keys(obj.legacy)) {
+          const v = obj.legacy[c]; lines.push(`• legacy ${c}: ${Array.isArray(v)? v.length : "err"}`);
+        }
+        if (obj.user?.docs) for (const c of Object.keys(obj.user.docs)) {
+          lines.push(`• user ${c}: ${(obj.user.docs[c]||[]).length} doc`);
+        }
+      }
+      return { det, text: lines.join("\\n") };
+    }
+
+    // Batch util — 500 operazioni max
+    async function batchSetDocs(pairs, { merge = true, dryRun = false } = {}) {
+      const chunkSize = 450;
+      let done = 0;
+      for (let i = 0; i < pairs.length; i += chunkSize) {
+        const chunk = pairs.slice(i, i + chunkSize);
+        if (!dryRun) {
+          const batch = writeBatch(db);
+          for (const { ref, data } of chunk) {
+            batch.set(ref, data, { merge });
+          }
+          await batch.commit();
+        }
+        done += chunk.length;
+        log(`   ↳ commit: ${done}/${pairs.length}`);
+      }
+      return done;
+    }
+
+    function collectLegacyPairs(obj) {
+      const out = [];
+      for (const name of Object.keys(obj.docs || {})) {
+        const arr = obj.docs[name] || [];
+        for (const it of arr) {
+          if (!it || !it.id) continue;
+          out.push({ ref: doc(db, name, it.id), data: it.data ?? {} });
+        }
+      }
+      return out;
+    }
+
+    function collectUserPairs(obj, uid) {
+      const out = [];
+      const docs = obj.docs || {};
+      for (const name of Object.keys(docs)) {
+        const arr = docs[name] || [];
+        for (const it of arr) {
+          if (!it || !it.id) continue;
+          out.push({ ref: doc(db, `users/${uid}/${name}`, it.id), data: it.data ?? {} });
+        }
+      }
+      return out;
+    }
+
+    // ======== Actions ========
+    async function inspectFile() {
+      const f = $("fileInput").files?.[0];
+      if (!f) throw new Error("Seleziona un file JSON di backup.");
+      parsed = await readFileAsJSON(f);
+      const { det, text } = summarizeFile(parsed);
+      $("fileMeta").textContent = text;
+
+      // Pre-seleziona toggle in base al tipo
+      if (det.type === "legacy") { $("chkLegacy").checked = true; $("chkUser").checked = false; }
+      if (det.type === "user")   { $("chkLegacy").checked = false; $("chkUser").checked = true; $("targetUid").placeholder = det.uid || "(vuoto = utente loggato)"; }
+      if (det.type === "all")    { $("chkLegacy").checked = true; $("chkUser").checked = true; $("targetUid").placeholder = det.uid || "(vuoto = uid del backup o utente loggato)"; }
+      log("🔎 Analisi completata.");
+    }
+
+    async function doImport() {
+      if (!parsed) throw new Error("Nessun file analizzato. Clicca 'Analizza file' prima.");
+      const doLegacy = $("chkLegacy").checked;
+      const doUser   = $("chkUser").checked;
+      const dryRun   = $("chkDryRun").checked;
+      const merge    = $("chkMerge").checked;
+
+      if (!doLegacy && !doUser) throw new Error("Seleziona almeno una destinazione (legacy o user).");
+
+      const { det } = summarizeFile(parsed); // re-detect per sicurezza
+
+      // Determina UID target
+      let target = $("targetUid").value.trim();
+      if (!target) {
+        if (det.type === "user" && det.uid) target = det.uid;
+        else if (det.type === "all" && det.uid) target = det.uid;
+        else target = auth.currentUser?.uid || "";
+      }
+      if (doUser && !target) throw new Error("Per import nello spazio utente serve un UID di destinazione o essere autenticato.");
+
+      log(`🚚 Import avviato — merge=${merge}, dryRun=${dryRun}`);
+      if (doUser) log(`   • Target UID: ${target}`);
+
+      // LEGACY
+      if (doLegacy) {
+        if (det.type === "legacy") {
+          const pairs = collectLegacyPairs(parsed);
+          log(`🏷️ Legacy: ${pairs.length} doc da scrivere sulle collezioni root.`);
+          try {
+            const n = await batchSetDocs(pairs, { merge, dryRun });
+            log(`✅ Legacy completato (${n} doc).`);
+          } catch (e) {
+            log("❌ Legacy import errore: " + (e.message || e));
+            log("👉 Verifica Firestore Rules (write su collezioni root) e App Check.");
+            throw e;
+          }
+        } else if (det.type === "all" && parsed.legacy) {
+          const pairs = [];
+          for (const name of Object.keys(parsed.legacy)) {
+            const arr = parsed.legacy[name];
+            if (!Array.isArray(arr)) {
+              log(`⚠️ legacy/${name}: valore non importabile (non è un array).`);
+              continue;
+            }
+            for (const it of arr) {
+              if (!it || !it.id) continue;
+              pairs.push({ ref: doc(db, name, it.id), data: it.data ?? {} });
+            }
+          }
+          log(`🏷️ Legacy: ${pairs.length} doc da scrivere (file 'all').`);
+          const n = await batchSetDocs(pairs, { merge, dryRun });
+          log(`✅ Legacy completato (${n} doc).`);
+        } else {
+          log("ℹ️ Nessun blocco legacy nel file selezionato.");
+        }
+      }
+
+      // USER
+      if (doUser) {
+        let userBlock = null;
+        if (det.type === "user") userBlock = parsed;
+        else if (det.type === "all") userBlock = parsed.user && { docs: parsed.user.docs };
+        if (!userBlock) {
+          log("ℹ️ Nessun blocco user nel file. Salto.");
+        } else {
+          const pairs = collectUserPairs(userBlock, target);
+          log(`👤 User ${target}: ${pairs.length} doc da scrivere.`);
+          try {
+            const n = await batchSetDocs(pairs, { merge, dryRun });
+            log(`✅ User completato (${n} doc).`);
+          } catch (e) {
+            log("❌ User import errore: " + (e.message || e));
+            log("👉 Verifica di essere autenticato come lo stesso uid e controlla le Rules / App Check.");
+            throw e;
+          }
+        }
+      }
+
+      log(dryRun ? "🧪 Dry-run completato. Nessuna modifica eseguita." : "🎉 Import completato.");
+    }
+
+    // ======== Wire up ========
+    function bind(id, fn) {
+      const el = $(id);
+      if (!el) { log(`❌ Manca elemento #${id}`); return; }
+      el.addEventListener("click", async () => {
+        try { await fn(); }
+        catch (e) { log(`❌ ${id}: ${e?.message || e}`); }
+      });
+    }
+
+    // Ping
+    bind("btnPing", async () => {
+      log("🟢 Ping ok.");
+      log("Auth currentUser: " + (auth.currentUser ? (auth.currentUser.email || auth.currentUser.uid) : "null"));
+      try {
+        await getDocs(collection(db, "_ping_ok_"));
+        log("Firestore operativo (lettura dummy riuscita o collezione inesistente).");
+      } catch (e) {
+        log("❌ Firestore test read: " + (e.message || e));
+      }
+    });
+
+    // Auth
+    bind("btnSignIn",  signInEmail);
+    bind("btnSignUp",  signUpEmail);
+    bind("btnReset",   resetPassword);
+    bind("btnAnon",    signInGuest);
+    bind("btnOut",     signOutAll);
+
+    // File
+    bind("btnInspect", inspectFile);
+
+    // Import
+    bind("btnImport",  doImport);
+
+    log("🚀 Pronto. Carica un JSON e clicca 'Analizza file'.");
+  </script>
+</body>
+</html>
