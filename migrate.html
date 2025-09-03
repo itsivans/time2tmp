@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8" />
+<title>Time Tracker — Migrazione (safe)</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<style>
+  body{font-family:system-ui,Arial;margin:20px}
+  .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:8px 0}
+  input,button{padding:10px;font-size:15px} button{cursor:pointer;border-radius:6px}
+  .primary{background:#1e88e5;color:#fff;border:none} .secondary{background:#eee;border:1px solid #ccc}
+  #log{white-space:pre-wrap;font-size:13px;background:#fafafa;border:1px solid #eee;padding:10px;border-radius:8px}
+</style>
+</head>
+<body>
+<h1>🧭 Migrazione NON distruttiva → users/{uid}</h1>
+<p>Copia i dati legacy in <code>users/{uid}/…</code> (stessi ID). Nessuna delete.</p>
+
+<h3>1) Accesso</h3>
+<div class="row">
+  <input id="email" type="email" placeholder="Email">
+  <input id="password" type="password" placeholder="Password">
+  <button id="btnSignIn" class="secondary">Accedi</button>
+  <button id="btnSignUp" class="secondary">Registrati</button>
+  <button id="btnOut" class="secondary" hidden>Esci</button>
+  <strong>Utente:</strong> <span id="userInfo">Non autenticato</span>
+</div>
+
+<h3>2) Conteggio</h3>
+<div class="row">
+  <button id="btnCount" class="secondary">Conta legacy & user</button>
+</div>
+<div id="counts"></div>
+
+<h3>3) Migra</h3>
+<div class="row">
+  <button id="btnMigrate" class="primary" disabled>Migra (copy-only)</button>
+</div>
+
+<h3>Log</h3>
+<pre id="log"></pre>
+
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+  import {
+    getFirestore, collection, getDocs, writeBatch, doc
+  } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+  import {
+    getAuth, onAuthStateChanged,
+    signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut
+  } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+
+  // === CONFIG (tua) ===
+  const firebaseConfig = {
+    apiKey: "AIzaSyDEq8aUhdBPcjYM6H6909DldXAdjhRNWbI",
+    authDomain: "time-ff7ed.firebaseapp.com",
+    projectId: "time-ff7ed",
+    storageBucket: "time-ff7ed.appspot.com",
+    messagingSenderId: "842285944784",
+    appId: "1:842285944784:web:de483548153abc956033d5",
+    measurementId: "G-ZR0BNWGVXJ"
+  };
+  const LEGACY = ["activities","entries","tags"];
+  const CHUNK = 300;
+
+  // === INIT ===
+  const app = initializeApp(firebaseConfig);
+  const db  = getFirestore(app);
+  const auth = getAuth(app);
+
+  // === UI helpers ===
+  const $ = id => document.getElementById(id);
+  const log = m => { $("log").textContent += m + "\n"; console.log(m); };
+
+  // Auth
+  $("btnSignIn").onclick = async () => {
+    await signInWithEmailAndPassword(auth, $("email").value.trim(), $("password").value);
+    log("✅ Login eseguito.");
+  };
+  $("btnSignUp").onclick = async () => {
+    await createUserWithEmailAndPassword(auth, $("email").value.trim(), $("password").value);
+    log("✅ Registrazione completata.");
+  };
+  $("btnOut").onclick = () => signOut(auth);
+
+  onAuthStateChanged(auth, (user) => {
+    $("btnOut").hidden = !user;
+    $("btnMigrate").disabled = !(user && !user.isAnonymous);
+    $("userInfo").textContent = user ? (user.email || user.uid) : "Non autenticato";
+  });
+
+  // Conteggio
+  $("btnCount").onclick = async () => {
+    const user = auth.currentUser;
+    const lines = [];
+    for (const name of LEGACY) {
+      const legacySize = (await getDocs(collection(db, name))).size;
+      const userSize = user ? (await getDocs(collection(db, `users/${user.uid}/${name}`))).size : "-";
+      lines.push(`${name}: legacy=${legacySize} | user=${userSize}`);
+    }
+    $("counts").textContent = lines.join("\n");
+    log("📊 Conteggio completato.");
+  };
+
+  // Migrazione (copy-only, merge)
+  $("btnMigrate").onclick = async () => {
+    const user = auth.currentUser;
+    if (!user || user.isAnonymous) { log("❌ Devi essere loggato."); return; }
+    const uid = user.uid;
+
+    for (const name of LEGACY) {
+      log(`→ Migro "${name}"…`);
+      const snap = await getDocs(collection(db, name));
+      const docs = snap.docs;
+      if (!docs.length) { log(`   nessun documento`); continue; }
+      for (let i=0;i<docs.length;i+=CHUNK) {
+        const batch = writeBatch(db);
+        for (const d of docs.slice(i,i+CHUNK)) {
+          batch.set(doc(db, `users/${uid}/${name}/${d.id}`),
+            { ...d.data(), ownerId: uid }, { merge: true });
+        }
+        await batch.commit();
+        log(`   commit ${Math.min(i+CHUNK, docs.length)}/${docs.length}`);
+      }
+      log(`✔ Completata migrazione "${name}" (${docs.length} doc)`);
+    }
+    log("✅ MIGRAZIONE FINITA. Verifica su Firestore: users/" + uid + "/…");
+  };
+</script>
+</body>
+</html>
