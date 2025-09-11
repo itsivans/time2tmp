@@ -17,16 +17,16 @@
 
   <style>
     body { font-family: Arial, system-ui, sans-serif; padding: 12px; }
-    input, button { margin: 4px; padding: 6px; font-size: 16px; }
+    input, button, select { margin: 4px; padding: 6px; font-size: 16px; }
     table { border-collapse: collapse; width: 100%; margin-top: 12px; }
-    th, td { border: 1px solid #aaa; padding: 5px 8px; }
+    th, td { border: 1px solid #aaa; padding: 5px 8px; vertical-align: middle; }
     th { background: #eee; }
     canvas { max-width: 100%; height: auto; }
     .tag { background: #eee; border-radius: 5px; padding: 2px 7px; margin-right: 5px; }
     .link-btn {
-      display: block;
+      display: inline-block;
       margin-top: 20px;
-      padding: 12px;
+      padding: 12px 16px;
       background: #2196f3;
       color: white;
       text-align: center;
@@ -35,6 +35,27 @@
       font-weight: bold;
     }
     #loading { display:none; margin:8px 0; color:#555; }
+    .actions { white-space: nowrap; text-align: right; }
+    .sm { padding: 6px 10px; font-size: 14px; border: none; border-radius: 6px; background: #eaeaea; cursor: pointer; }
+    .sm + .sm { margin-left: 6px; }
+    .sm.danger { background: #ffdddd; color: #a40000; }
+    .sm.primary { background: #2196f3; color: #fff; }
+
+    /* Overlay / modal per modifica */
+    .overlay {
+      position: fixed; inset: 0; background: rgba(0,0,0,.35);
+      display: none; align-items: center; justify-content: center; z-index: 9999;
+    }
+    .overlay.show { display: flex; }
+    .modal {
+      width: min(520px, 92vw);
+      background: #fff; border-radius: 10px; padding: 16px; box-shadow: 0 10px 30px rgba(0,0,0,.2);
+    }
+    .modal h3 { margin: 0 0 8px; }
+    .row { display: flex; gap: 8px; }
+    .row > * { flex: 1; }
+    .modal .btns { display:flex; justify-content: space-between; gap: 8px; margin-top: 8px; }
+    .btns .left, .btns .right { display:flex; gap: 8px; }
   </style>
 </head>
 <body>
@@ -71,17 +92,57 @@
   <hr>
   <h2>📋 Attività</h2>
   <div>
-    <button id="btnLast">Ultimi 5</button>
-    <button id="btnAll">Mostra tutti</button>
+    <button id="btnLast" class="sm primary">Ultimi 5 (realtime)</button>
+    <button id="btnAll"  class="sm">Mostra tutti</button>
   </div>
   <table id="activityTable">
     <thead>
-      <tr><th>Data</th><th>Ora</th><th>Tag</th><th>Attività</th></tr>
+      <tr><th>Data</th><th>Ora</th><th>Tag</th><th>Attività</th><th class="actions">Azioni</th></tr>
     </thead>
     <tbody id="activityList"></tbody>
   </table>
 
-  <a href="index.html" class="link-btn">📥 Torna all’inserimento</a>
+  <div style="margin-top:14px">
+    <a href="index.html" class="link-btn">📥 Torna all’inserimento</a>
+  </div>
+
+  <!-- Overlay di modifica -->
+  <div id="editOverlay" class="overlay" aria-hidden="true">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="editTitle">
+      <h3 id="editTitle">✏️ Modifica attività</h3>
+      <input type="text" id="editActivity" placeholder="Attività…">
+      <div class="row">
+        <input type="datetime-local" id="editDateTime">
+        <select id="editTag">
+          <option value="">--Tag--</option>
+          <option>Entertainment</option>
+          <option>Survive</option>
+          <option>Study</option>
+          <option>Work</option>
+          <option>Nut</option>
+          <option>Slavery</option>
+          <option>Productivity</option>
+          <option>Waste</option>
+          <option>Chess</option>
+          <option>Gym</option>
+          <option>Bike</option>
+          <option>Holiday</option>
+          <option>Chinese</option>
+          <option>Sleep</option>
+          <option>Book</option>
+        </select>
+      </div>
+      <div class="btns">
+        <div class="left">
+          <button id="deleteEditBtn" class="sm danger">🗑️ Elimina</button>
+        </div>
+        <div class="right">
+          <button id="cancelEditBtn" class="sm">Annulla</button>
+          <button id="saveEditBtn" class="sm primary">Salva</button>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <script>
     // === Firebase init ===
@@ -108,15 +169,20 @@
     const NON_LIBERI = ["Survive", "Sleep", "Work", "Slavery"];
     let statsPieChart = null, weekPieChart = null;
     let unsubLatest = null; // realtime ultimi 5
+    let currentEditId = null;
 
     // Helpers
     const isoDayStart = d => `${d}T00:00:00`;
     const isoDayEnd   = d => `${d}T23:59:59`;
     const $ = s => document.querySelector(s);
     const loadingEl = $('#loading');
-
     function setLoading(on){ loadingEl.style.display = on ? 'block' : 'none'; }
     function userActivities(uid){ return db.collection(`users/${uid}/activities`); }
+    function toInputDateTimeLocal(str){
+      // accetta "YYYY-MM-DDTHH:mm" o "YYYY-MM-DDTHH:mm:ss"
+      if (!str) return '';
+      return str.length >= 16 ? str.slice(0,16) : str;
+    }
 
     // === Auth guard + bootstrap ===
     document.addEventListener('DOMContentLoaded', () => {
@@ -135,7 +201,7 @@
         if (!$('#weekStart').value) $('#weekStart').value = monday.toISOString().slice(0,10);
         if (!$('#weekEnd').value)   $('#weekEnd').value   = sunday.toISOString().slice(0,10);
 
-        // Tabella: default ultimi 5
+        // Tabella: default ultimi 5 (realtime)
         renderActivitiesTable(u.uid, 'latest');
 
         // Bottoni lista
@@ -144,10 +210,18 @@
 
         // Confronto date
         $('#btnCompare').onclick = () => compareTwoDays(u.uid);
+
+        // Overlay buttons
+        $('#cancelEditBtn').onclick = closeEdit;
+        $('#saveEditBtn').onclick   = saveEdit;
+        $('#deleteEditBtn').onclick = () => { if (currentEditId) deleteActivity(currentEditId); };
+        $('#editOverlay').addEventListener('click', (e)=>{
+          if (e.target.id === 'editOverlay') closeEdit();
+        });
       });
     });
 
-    // === Tabella: Ultimi 5 (realtime) / Tutti (one-shot) ===
+    // === Tabella: Ultimi 5 (realtime) / Tutti (one-shot) con azioni ===
     function renderActivitiesTable(uid, mode='latest') {
       if (unsubLatest) { unsubLatest(); unsubLatest = null; }
 
@@ -168,6 +242,10 @@
               <td>${localTime}</td>
               <td><span class="tag">${d.tag || 'Nessun tag'}</span></td>
               <td>${d.activity || ''}</td>
+              <td class="actions">
+                <button class="sm" onclick="openEdit('${doc.id}')">✏️</button>
+                <button class="sm danger" onclick="deleteActivity('${doc.id}')">🗑️</button>
+              </td>
             </tr>`;
         });
       };
@@ -178,6 +256,53 @@
         q.get().then(updateDOM);
       }
     }
+
+    // === Apertura overlay modifica ===
+    async function openEdit(id){
+      const u = auth.currentUser; if (!u) return;
+      currentEditId = id;
+      try {
+        const snap = await userActivities(u.uid).doc(id).get();
+        if (!snap.exists) { alert('Documento inesistente.'); return; }
+        const d = snap.data();
+        $('#editActivity').value = d.activity || '';
+        $('#editTag').value      = d.tag || '';
+        $('#editDateTime').value = toInputDateTimeLocal(d.timestamp || '');
+        $('#editOverlay').classList.add('show');
+        $('#editOverlay').setAttribute('aria-hidden', 'false');
+      } catch(e){ console.error(e); alert('Errore apertura modifica: '+e.message); }
+    }
+    function closeEdit(){
+      currentEditId = null;
+      $('#editOverlay').classList.remove('show');
+      $('#editOverlay').setAttribute('aria-hidden', 'true');
+    }
+
+    // === Salvataggio modifica ===
+    async function saveEdit(){
+      const u = auth.currentUser; if (!u) return;
+      if (!currentEditId) return;
+      const activity = $('#editActivity').value.trim();
+      const tag      = $('#editTag').value;
+      const ts       = $('#editDateTime').value;
+      if (!activity || !tag || !ts) { alert('Compila attività, tag e data/ora.'); return; }
+      try {
+        await userActivities(u.uid).doc(currentEditId).update({ activity, tag, timestamp: ts });
+        closeEdit();
+      } catch(e){ console.error(e); alert('Errore salvataggio: '+e.message); }
+    }
+
+    // === Cancellazione record (da tabella o overlay) ===
+    async function deleteActivity(id){
+      const u = auth.currentUser; if (!u) return;
+      if (!confirm('Eliminare definitivamente questa attività?')) return;
+      try {
+        await userActivities(u.uid).doc(id).delete();
+        if (id === currentEditId) closeEdit();
+      } catch(e){ console.error(e); alert('Errore eliminazione: '+e.message); }
+    }
+    window.openEdit = openEdit;
+    window.deleteActivity = deleteActivity;
 
     // === Statistiche giornaliere ===
     async function calcolaPercentualiPerData(filtro = "all") {
