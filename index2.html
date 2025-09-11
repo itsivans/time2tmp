@@ -4,6 +4,7 @@
   <meta charset="utf-8" />
   <title>Activity Tracker — Login richiesto</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="manifest" href="manifest.json">
   <link rel="icon" href="icon-192.png">
   <meta name="theme-color" content="#2196f3">
 
@@ -15,7 +16,7 @@
   <style>
     body { font-family: Arial; margin: 12px; }
     input, select, button { width: 100%; padding: 12px; margin: 6px 0; font-size: 16px; box-sizing: border-box; }
-    .link { background:#2196f3; color:#fff; border:none; border-radius:6px; margin-top:16px; font-weight:bold; }
+    .link { background:#2196f3; color:#fff; border:none; border-radius:6px; margin-top:16px; font-weight:bold; width:100%; }
     .card { border:1px solid #ddd; border-radius:8px; padding:12px; margin:12px 0; }
     .row { display:flex; gap:8px; }
     .row > * { flex:1; }
@@ -27,7 +28,7 @@
 
   <h2>🔐 Accesso richiesto</h2>
 
-  <!-- Blocco LOGIN/REGISTRAZIONE -->
+  <!-- BLOCCO LOGIN/REGISTRAZIONE -->
   <div id="authBox" class="card">
     <div class="row">
       <input id="email" type="email" placeholder="Email" autocomplete="email">
@@ -40,7 +41,7 @@
     <p class="muted">Devi essere loggato per inserire attività e vedere le tue statistiche.</p>
   </div>
 
-  <!-- UI UTENTE + FORM ATTIVITÀ (visibile solo se loggato) -->
+  <!-- UI UTENTE + FORM ATTIVITÀ (SOLO SE LOGGATO) -->
   <div id="appBox" class="hidden">
     <div class="card">
       <div id="userInfo" class="muted">—</div>
@@ -77,21 +78,23 @@
   </div>
 
   <script>
-    // === 1) CONFIG FIREBASE ===
+    // === 1) CONFIG FIREBASE (presa dal tuo app.js) ===
     const firebaseConfig = {
-      apiKey: "…",
-      authDomain: "…",
-      projectId: "…",
-      storageBucket: "…",
-      messagingSenderId: "…",
-      appId: "…"
+      apiKey: "AIzaSyDEq8aUhdBPcjYM6H6909DldXAdjhRNWbI",
+      authDomain: "time-ff7ed.firebaseapp.com",
+      projectId: "time-ff7ed",
+      storageBucket: "time-ff7ed.appspot.com",
+      messagingSenderId: "842285944784",
+      appId: "1:842285944784:web:de483548153abc956033d5",
+      measurementId: "G-ZR0BNWGVXJ"
     };
-    firebase.initializeApp(firebaseConfig);
+    if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+
     const auth = firebase.auth();
     const db   = firebase.firestore();
 
     // === 2) UI HELPERS ===
-    const $ = sel => document.querySelector(sel);
+    const $ = s => document.querySelector(s);
     const authBox = $('#authBox');
     const appBox  = $('#appBox');
     const userInfo= $('#userInfo');
@@ -99,12 +102,31 @@
 
     function setMsg(t){ msg.textContent = t || ''; }
 
-    // === 3) AUTH STATE ===
+    // Genera ISO locale "YYYY-MM-DDTHH:mm" (senza secondi), come nel tuo app.js
+    function getLocalISODateTimeNow(){
+      const now = new Date();
+      now.setSeconds(0,0);
+      const tzOffset = -now.getTimezoneOffset();
+      const localISO = new Date(now.getTime() + tzOffset * 60000).toISOString().slice(0,16);
+      return localISO; // es: 2025-09-11T22:15
+    }
+
+    // === 3) AUTH STATE (mostra/nasconde UI) ===
     auth.onAuthStateChanged(user => {
       if (user) {
         authBox.classList.add('hidden');
         appBox.classList.remove('hidden');
         userInfo.textContent = `Loggato come ${user.email} (uid: ${user.uid})`;
+
+        // Precompila datetime se vuoto
+        const dt = $('#dateTime');
+        if (!dt.value) dt.value = getLocalISODateTimeNow();
+
+        // Abilita invio rapito con Enter sull'input attività
+        const act = $('#activity');
+        act.onkeydown = (e) => { if (e.key === 'Enter') $('#addBtn').click(); };
+        act.onfocus = () => { if (!dt.value) dt.value = getLocalISODateTimeNow(); };
+
       } else {
         appBox.classList.add('hidden');
         authBox.classList.remove('hidden');
@@ -120,8 +142,7 @@
         await auth.signInWithEmailAndPassword(email, pass);
         setMsg('Accesso eseguito.');
       } catch (e) {
-        console.error(e);
-        setMsg(mapAuthError(e.code, e.message));
+        console.error(e); setMsg(mapAuthError(e.code, e.message));
       }
     };
 
@@ -134,8 +155,7 @@
         await auth.currentUser.sendEmailVerification();
         setMsg('Registrazione ok. Verifica la tua email.');
       } catch (e) {
-        console.error(e);
-        setMsg(mapAuthError(e.code, e.message));
+        console.error(e); setMsg(mapAuthError(e.code, e.message));
       }
     };
 
@@ -155,20 +175,23 @@
     // === 5) AGGIUNTA ATTIVITÀ (solo se loggato) ===
     $('#addBtn').onclick = async () => {
       const user = auth.currentUser;
-      if (!user) { return setMsg('Devi essere loggato.'); }
+      if (!user) return setMsg('Devi essere loggato.');
 
       const activity = $('#activity').value.trim();
-      const tag      = $('#tag').value || null;
-      const dtVal    = $('#dateTime').value; // "YYYY-MM-DDTHH:mm" (ora locale)
-      const ts = dtVal ? new Date(dtVal).getTime() : Date.now(); // NUMERO (ms), facile da ordinare
+      const tag      = $('#tag').value;
+      let   dateTime = $('#dateTime').value;
 
-      if (!activity) return setMsg('Scrivi il nome dell’attività.');
+      if (!activity || !tag) return setMsg('Inserisci attività e tag!');
+      if (!dateTime) dateTime = getLocalISODateTimeNow();
 
       try {
+        // Salviamo come stringa ISO locale, coerente con il tuo statistics.html
         await db.collection(`users/${user.uid}/activities`).add({
-          activity, tag, timestamp: ts, createdAt: firebase.firestore.FieldValue.serverTimestamp()
+          activity, tag, timestamp: dateTime
         });
         $('#activity').value = '';
+        $('#dateTime').value = '';
+        $('#tag').value = '';
         setMsg('Attività salvata.');
       } catch (e) {
         console.error(e);
@@ -176,9 +199,11 @@
       }
     };
 
-    // (Opzionale) Service Worker
+    // === 6) Service Worker (opzionale) ===
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('service-worker.js').catch(()=>{});
+      navigator.serviceWorker.register('service-worker.js')
+        .then(()=>console.log('✅ Service Worker registrato'))
+        .catch(err=>console.warn('❌ SW errore:', err));
     }
   </script>
 </body>
