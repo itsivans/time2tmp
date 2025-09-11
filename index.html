@@ -2,7 +2,7 @@
 <html lang="it">
 <head>
   <meta charset="utf-8" />
-  <title>Activity Tracker — Login richiesto</title>
+  <title>Activity Tracker — Accesso</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <link rel="manifest" href="manifest.json">
   <link rel="icon" href="icon-192.png">
@@ -14,15 +14,35 @@
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 
   <style>
-    body { font-family: Arial; margin: 12px; }
+    :root {
+      --primary:#2196f3;
+      --muted:#666;
+      --border:#ddd;
+    }
+    body { font-family: Arial, system-ui, sans-serif; margin: 12px; }
     input, select, button { width: 100%; padding: 12px; margin: 6px 0; font-size: 16px; box-sizing: border-box; }
-    .link { background:#2196f3; color:#fff; border:none; border-radius:6px; margin-top:16px; font-weight:bold; width:100%; }
-    .card { border:1px solid #ddd; border-radius:8px; padding:12px; margin:12px 0; }
+    .card { border:1px solid var(--border); border-radius:8px; padding:12px; margin:12px 0; }
     .row { display:flex; gap:8px; }
     .row > * { flex:1; }
-    .muted { color:#666; font-size:14px; }
+    .muted { color:var(--muted); font-size:14px; }
     .hidden { display:none; }
-
+    .link { background:var(--primary); color:#fff; border:none; border-radius:6px; margin-top:16px; font-weight:bold; width:100%; }
+    .link-plain { background:none; border:none; color:var(--primary); padding:0; cursor:pointer; font:inherit; }
+    .statusbar {
+      display:flex; align-items:center; gap:10px;
+      font-size:14px; color:var(--muted); padding:6px 0; margin-top:-6px;
+    }
+    .statusbar .spacer { flex:1; }
+    .pill {
+      display:inline-block; padding:2px 8px; border-radius:999px; background:#f2f6ff; color:#1b5dbf; font-weight:600;
+    }
+    /* Nickname editor */
+    #nickEditor {
+      display:none; gap:8px; align-items:center; margin-top:6px;
+    }
+    #nickEditor .sm { width:auto; padding:8px 12px; border:none; border-radius:6px; background:#eaeaea; cursor:pointer; }
+    #nickEditor .sm.primary { background:var(--primary); color:#fff; }
+    #nickEditor .sm.ghost { background:#f6f6f6; color:#333; }
     /* Toast */
     #toast { position:fixed; left:50%; bottom:24px; transform:translateX(-50%);
       background:#323232; color:#fff; padding:10px 14px; border-radius:8px;
@@ -32,10 +52,9 @@
 </head>
 <body>
 
-  <h2>🔐 Accesso richiesto</h2>
-
-  <!-- BLOCCO LOGIN/REGISTRAZIONE -->
+  <!-- BLOCCO LOGIN/REGISTRAZIONE (quando non loggato) -->
   <div id="authBox" class="card">
+    <h3>🔐 Accedi</h3>
     <div class="row">
       <input id="email" type="email" placeholder="Email" autocomplete="email">
       <input id="pass" type="password" placeholder="Password" autocomplete="current-password">
@@ -44,14 +63,25 @@
       <button id="loginBtn">Accedi</button>
       <button id="signupBtn">Registrati</button>
     </div>
-    <p class="muted">Devi essere loggato per inserire attività e vedere le tue statistiche.</p>
+    <p class="muted">Devi essere loggato per inserire attività e vedere le statistiche.</p>
   </div>
 
-  <!-- UI UTENTE + FORM ATTIVITÀ (SOLO SE LOGGATO) -->
+  <!-- APP (quando loggato) -->
   <div id="appBox" class="hidden">
-    <div class="card">
-      <div id="userInfo" class="muted">—</div>
-      <button id="logoutBtn">Esci</button>
+    <!-- Barra stato minimale -->
+    <div class="statusbar">
+      <span>✅ Sei loggato come <span class="pill" id="who">—</span></span>
+      <span class="spacer"></span>
+      <button id="editNickLink" class="link-plain" title="Modifica nickname">modifica nickname</button>
+      <span>·</span>
+      <button id="logoutBtn" class="link-plain" title="Esci">logout</button>
+    </div>
+    <!-- Editor nickname (solo locale, non sul DB) -->
+    <div id="nickEditor" class="row">
+      <input id="nickInput" type="text" placeholder="Il tuo nickname (solo su questo dispositivo)">
+      <button id="saveNickBtn" class="sm primary">Salva</button>
+      <button id="clearNickBtn" class="sm ghost">Rimuovi</button>
+      <button id="cancelNickBtn" class="sm">Annulla</button>
     </div>
 
     <div class="card">
@@ -107,13 +137,17 @@
     const auth = firebase.auth();
     const db   = firebase.firestore();
 
-    // === UI helpers ===
+    // === Helpers UI ===
     const $ = s => document.querySelector(s);
-    const authBox = $('#authBox');
-    const appBox  = $('#appBox');
-    const userInfo= $('#userInfo');
-    const msg     = $('#msg');
-    const toastEl = $('#toast');
+    const authBox   = $('#authBox');
+    const appBox    = $('#appBox');
+    const whoEl     = $('#who');
+    const msg       = $('#msg');
+    const toastEl   = $('#toast');
+    const nickRow   = $('#nickEditor');
+    const nickInput = $('#nickInput');
+
+    const NICK_KEY = 'timeNickname';
 
     function setMsg(t){ msg.textContent = t || ''; }
     function showToast(text){
@@ -121,12 +155,27 @@
       toastEl.classList.add('show');
       setTimeout(()=>toastEl.classList.remove('show'), 1600);
     }
-
     function getLocalISODateTimeNow(){
       const now = new Date();
       now.setSeconds(0,0);
       const tzOffset = -now.getTimezoneOffset();
-      return new Date(now.getTime() + tzOffset * 60000).toISOString().slice(0,16); // "YYYY-MM-DDTHH:mm"
+      return new Date(now.getTime() + tzOffset * 60000).toISOString().slice(0,16);
+    }
+    function loadNick(){ try { return localStorage.getItem(NICK_KEY) || ''; } catch { return ''; } }
+    function saveNick(v){ try { localStorage.setItem(NICK_KEY, v||''); } catch {} }
+    function clearNick(){ try { localStorage.removeItem(NICK_KEY); } catch {} }
+    function nameFromEmail(email){ return (email || '').split('@')[0]; }
+    function updateWho(user){
+      const nick = loadNick().trim();
+      whoEl.textContent = nick || user.email || 'utente';
+    }
+    function toggleNickEditor(show){
+      nickRow.style.display = show ? 'flex' : 'none';
+      if (show) {
+        const current = loadNick().trim();
+        nickInput.value = current || (auth.currentUser ? nameFromEmail(auth.currentUser.email) : '');
+        setTimeout(()=>nickInput.focus(), 0);
+      }
     }
 
     // === Auth state ===
@@ -134,7 +183,7 @@
       if (user) {
         authBox.classList.add('hidden');
         appBox.classList.remove('hidden');
-        userInfo.textContent = `Loggato come ${user.email} (uid: ${user.uid})`;
+        updateWho(user);
 
         const dt = $('#dateTime');
         if (!dt.value) dt.value = getLocalISODateTimeNow();
@@ -142,6 +191,7 @@
         const act = $('#activity');
         act.onkeydown = (e) => { if (e.key === 'Enter') $('#addBtn').click(); };
         act.onfocus   = () => { if (!dt.value) dt.value = getLocalISODateTimeNow(); };
+
       } else {
         appBox.classList.add('hidden');
         authBox.classList.remove('hidden');
@@ -175,6 +225,23 @@
       };
       return map[code] || fallback || 'Errore.';
     }
+
+    // === Nickname (solo locale, non su DB) ===
+    $('#editNickLink').onclick = () => toggleNickEditor(true);
+    $('#cancelNickBtn').onclick = () => toggleNickEditor(false);
+    $('#saveNickBtn').onclick = () => {
+      const v = nickInput.value.trim();
+      saveNick(v);
+      toggleNickEditor(false);
+      if (auth.currentUser) updateWho(auth.currentUser);
+      showToast('✅ Nickname aggiornato');
+    };
+    $('#clearNickBtn').onclick = () => {
+      clearNick();
+      toggleNickEditor(false);
+      if (auth.currentUser) updateWho(auth.currentUser);
+      showToast('ℹ️ Nickname rimosso');
+    };
 
     // === Add activity ===
     $('#addBtn').onclick = async () => {
