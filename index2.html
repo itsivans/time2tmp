@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8" />
+  <title>Activity Tracker — Login richiesto</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="icon" href="icon-192.png">
+  <meta name="theme-color" content="#2196f3">
+
+  <!-- Firebase (compat) -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+
+  <style>
+    body { font-family: Arial; margin: 12px; }
+    input, select, button { width: 100%; padding: 12px; margin: 6px 0; font-size: 16px; box-sizing: border-box; }
+    .link { background:#2196f3; color:#fff; border:none; border-radius:6px; margin-top:16px; font-weight:bold; }
+    .card { border:1px solid #ddd; border-radius:8px; padding:12px; margin:12px 0; }
+    .row { display:flex; gap:8px; }
+    .row > * { flex:1; }
+    .muted { color:#666; font-size:14px; }
+    .hidden { display:none; }
+  </style>
+</head>
+<body>
+
+  <h2>🔐 Accesso richiesto</h2>
+
+  <!-- Blocco LOGIN/REGISTRAZIONE -->
+  <div id="authBox" class="card">
+    <div class="row">
+      <input id="email" type="email" placeholder="Email" autocomplete="email">
+      <input id="pass" type="password" placeholder="Password" autocomplete="current-password">
+    </div>
+    <div class="row">
+      <button id="loginBtn">Accedi</button>
+      <button id="signupBtn">Registrati</button>
+    </div>
+    <p class="muted">Devi essere loggato per inserire attività e vedere le tue statistiche.</p>
+  </div>
+
+  <!-- UI UTENTE + FORM ATTIVITÀ (visibile solo se loggato) -->
+  <div id="appBox" class="hidden">
+    <div class="card">
+      <div id="userInfo" class="muted">—</div>
+      <button id="logoutBtn">Esci</button>
+    </div>
+
+    <div class="card">
+      <h3>📥 Inserisci attività</h3>
+      <input type="text" id="activity" placeholder="Attività...">
+      <input type="datetime-local" id="dateTime">
+      <select id="tag">
+        <option value="">--Tag--</option>
+        <option>Entertainment</option>
+        <option>Survive</option>
+        <option>Study</option>
+        <option>Work</option>
+        <option>Nut</option>
+        <option>Slavery</option>
+        <option>Productivity</option>
+        <option>Waste</option>
+        <option>Chess</option>
+        <option>Gym</option>
+        <option>Bike</option>
+        <option>Holiday</option>
+        <option>Chinese</option>
+        <option>Sleep</option>
+        <option>Book</option>
+      </select>
+      <button id="addBtn">➕ Aggiungi</button>
+      <div id="msg" class="muted"></div>
+    </div>
+
+    <a href="statistics.html"><button class="link">📊 Vai alle statistiche</button></a>
+  </div>
+
+  <script>
+    // === 1) CONFIG FIREBASE ===
+    const firebaseConfig = {
+      apiKey: "…",
+      authDomain: "…",
+      projectId: "…",
+      storageBucket: "…",
+      messagingSenderId: "…",
+      appId: "…"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
+    const db   = firebase.firestore();
+
+    // === 2) UI HELPERS ===
+    const $ = sel => document.querySelector(sel);
+    const authBox = $('#authBox');
+    const appBox  = $('#appBox');
+    const userInfo= $('#userInfo');
+    const msg     = $('#msg');
+
+    function setMsg(t){ msg.textContent = t || ''; }
+
+    // === 3) AUTH STATE ===
+    auth.onAuthStateChanged(user => {
+      if (user) {
+        authBox.classList.add('hidden');
+        appBox.classList.remove('hidden');
+        userInfo.textContent = `Loggato come ${user.email} (uid: ${user.uid})`;
+      } else {
+        appBox.classList.add('hidden');
+        authBox.classList.remove('hidden');
+      }
+    });
+
+    // === 4) AZIONI AUTH ===
+    $('#loginBtn').onclick = async () => {
+      const email = $('#email').value.trim();
+      const pass  = $('#pass').value;
+      if (!email || !pass) return setMsg('Inserisci email e password.');
+      try {
+        await auth.signInWithEmailAndPassword(email, pass);
+        setMsg('Accesso eseguito.');
+      } catch (e) {
+        console.error(e);
+        setMsg(mapAuthError(e.code, e.message));
+      }
+    };
+
+    $('#signupBtn').onclick = async () => {
+      const email = $('#email').value.trim();
+      const pass  = $('#pass').value;
+      if (!email || !pass) return setMsg('Inserisci email e password.');
+      try {
+        await auth.createUserWithEmailAndPassword(email, pass);
+        await auth.currentUser.sendEmailVerification();
+        setMsg('Registrazione ok. Verifica la tua email.');
+      } catch (e) {
+        console.error(e);
+        setMsg(mapAuthError(e.code, e.message));
+      }
+    };
+
+    $('#logoutBtn').onclick = () => auth.signOut();
+
+    function mapAuthError(code, fallback){
+      const map = {
+        'auth/invalid-email': 'Email non valida.',
+        'auth/user-not-found': 'Utente non trovato.',
+        'auth/wrong-password': 'Password errata.',
+        'auth/email-already-in-use': 'Email già in uso.',
+        'auth/too-many-requests': 'Troppe richieste, riprova più tardi.'
+      };
+      return map[code] || fallback || 'Errore.';
+    }
+
+    // === 5) AGGIUNTA ATTIVITÀ (solo se loggato) ===
+    $('#addBtn').onclick = async () => {
+      const user = auth.currentUser;
+      if (!user) { return setMsg('Devi essere loggato.'); }
+
+      const activity = $('#activity').value.trim();
+      const tag      = $('#tag').value || null;
+      const dtVal    = $('#dateTime').value; // "YYYY-MM-DDTHH:mm" (ora locale)
+      const ts = dtVal ? new Date(dtVal).getTime() : Date.now(); // NUMERO (ms), facile da ordinare
+
+      if (!activity) return setMsg('Scrivi il nome dell’attività.');
+
+      try {
+        await db.collection(`users/${user.uid}/activities`).add({
+          activity, tag, timestamp: ts, createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+        $('#activity').value = '';
+        setMsg('Attività salvata.');
+      } catch (e) {
+        console.error(e);
+        setMsg('Errore nel salvataggio: ' + e.message);
+      }
+    };
+
+    // (Opzionale) Service Worker
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('service-worker.js').catch(()=>{});
+    }
+  </script>
+</body>
+</html>
