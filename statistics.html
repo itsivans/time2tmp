@@ -5,9 +5,15 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link rel="icon" href="icon-192.png">
   <meta name="theme-color" content="#2196f3">
+
+  <!-- Firebase (compat) -->
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+
+  <!-- Chart.js -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
   <style>
     body { font-family: Arial; padding: 12px; }
     input, button { margin: 4px; padding: 6px; font-size: 16px; }
@@ -64,16 +70,31 @@
 
   <a href="index.html" class="link-btn">📥 Torna all’inserimento</a>
 
-  <script src="app-statistics.js"></script>
+  <!-- 1) Init Firebase una volta sola -->
   <script>
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('service-worker.js')
-        .then(() => console.log('✅ Service Worker registrato'))
-        .catch(err => console.error('❌ SW errore:', err));
-    }
+    const firebaseConfig = {
+      apiKey: "AIzaSyDEq8aUhdBPcjYM6H6909DldXAdjhRNWbI",
+      authDomain: "time-ff7ed.firebaseapp.com",
+      projectId: "time-ff7ed",
+      storageBucket: "time-ff7ed.appspot.com",
+      messagingSenderId: "842285944784",
+      appId: "1:842285944784:web:de483548153abc956033d5",
+      measurementId: "G-ZR0BNWGVXJ"
+    };
+    if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
 
-    function loadActivitiesList() {
-      db.collection("activities")
+    // Rendo disponibili anche in questo script
+    const auth = firebase.auth();
+    const db   = firebase.firestore();
+  </script>
+
+  <!-- 2) Logica statistiche (namespaced su users/{uid}/activities) -->
+  <script src="app-statistics.js"></script>
+
+  <!-- 3) Tabella "Tutte le attività" SOLO mie + Auth guard -->
+  <script>
+    function renderActivitiesTable(uid) {
+      db.collection(`users/${uid}/activities`)
         .orderBy("timestamp", "desc")
         .get()
         .then(snapshot => {
@@ -92,9 +113,26 @@
                 <td>${data.activity || ''}</td>
               </tr>`;
           });
-        });
+        })
+        .catch(err => console.error('Errore caricamento tabella:', err));
     }
-    window.onload = loadActivitiesList;
+
+    auth.onAuthStateChanged(u => {
+      if (!u) {
+        // Non loggato → torna alla pagina con login
+        location.href = 'index.html';
+        return;
+      }
+      // Carica tabella quando loggato
+      renderActivitiesTable(u.uid);
+    });
+
+    // Service Worker (ok tenerlo)
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('service-worker.js')
+        .then(() => console.log('✅ Service Worker registrato'))
+        .catch(err => console.error('❌ SW errore:', err));
+    }
   </script>
 </body>
 </html>
