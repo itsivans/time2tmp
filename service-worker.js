@@ -3,7 +3,7 @@ const PRECACHE = [
   'manifest.json',
   'icon-192.png',
   'icon-512.png'
-  // NOTA: non pre-cachiamo più HTML/JS, così non rimangono vecchi
+  // Non pre-cachiamo HTML/JS per evitare versioni stantie.
 ];
 
 self.addEventListener('install', (event) => {
@@ -20,11 +20,11 @@ self.addEventListener('activate', (event) => {
   self.clients.claim();
 });
 
-// Network-first per navigazioni (HTML), SWR per il resto
+// Network-first per HTML, SWR per il resto
 self.addEventListener('fetch', (event) => {
   const req = event.request;
 
-  // Pagine HTML / navigate
+  // Navigazioni (HTML)
   if (req.mode === 'navigate') {
     event.respondWith((async () => {
       try {
@@ -32,7 +32,7 @@ self.addEventListener('fetch', (event) => {
         const cache = await caches.open(CACHE_NAME);
         cache.put(req, fresh.clone());
         return fresh;
-      } catch {
+      } catch (e) {
         const cached = await caches.match(req);
         return cached || Response.error();
       }
