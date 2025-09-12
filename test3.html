@@ -3,296 +3,329 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Coach del Tempo — Preview</title>
+<title>Dashboard Semplice — Opzioni</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <style>
   :root{
-    --bg:#fff; --text:#1f2328; --muted:#6b7280; --line:#e5e7eb;
-    --good:#10b981; --neutral:#f59e0b; --bad:#ef4444; --primary:#1e88e5;
-    --card:#f8fafc;
+    --bg:#ffffff; --text:#1f2328; --muted:#6b7280; --line:#e5e7eb;
+    --good:#10b981; --neutral:#f59e0b; --bad:#ef4444; --primary:#1e88e5; --card:#f8fafc;
   }
   *{box-sizing:border-box}
-  body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;background:var(--bg);color:var(--text)}
-  header{padding:12px 16px;border-bottom:1px solid var(--line);display:flex;gap:12px;align-items:center;flex-wrap:wrap}
-  header h1{font-size:18px;margin:0;font-weight:800}
-  .wrap{padding:14px 16px}
-  .grid{display:grid;gap:12px}
-  .cards{grid-template-columns:repeat(auto-fit,minmax(220px,1fr))}
-  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px}
-  .mini{font-size:12px;color:var(--muted)}
-  .lead{font-size:22px;font-weight:800}
-  .delta{font-size:12px;font-weight:700}
-  .delta.up{color:var(--good)} .delta.down{color:var(--bad)}
-  .kpiRow{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
-  .pill{padding:2px 8px;border-radius:999px;background:#eef2ff;font-size:12px}
-  .feedback{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
-  .fb{font-size:12px;padding:4px 8px;border-radius:999px;border:1px solid var(--line);background:#fff}
-  .fb.good{border-color:#c7f8e9;background:#eafff7} .fb.warn{border-color:#ffe4b3;background:#fff7e6} .fb.bad{border-color:#ffc7c7;background:#fff0f0}
-  .row{display:flex;gap:12px;flex-wrap:wrap;align-items:flex-start}
-  .col{flex:1 1 340px;max-width:520px}
-  .chartBox{width:100%;max-width:380px;margin:auto;position:relative}
-  .chartBox canvas{width:100% !important;height:220px !important;display:block}
+  body{margin:0; font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial; background:var(--bg); color:var(--text)}
+  header{padding:12px 16px; border-bottom:1px solid var(--line)}
+  header h1{margin:0; font-size:18px; font-weight:800}
+  .wrap{padding:14px 16px; display:grid; gap:18px}
+  .block{border:1px solid var(--line); border-radius:12px; background:var(--card); padding:12px}
+  .title{margin:0 0 8px; font-size:16px; font-weight:800}
+  .mini{font-size:12px; color:var(--muted)}
+  .lead{font-size:22px; font-weight:800}
+  .row{display:flex; gap:12px; flex-wrap:wrap; align-items:flex-start}
+  .col{flex:1 1 320px; max-width:520px}
+  .chip{padding:4px 8px; border:1px solid var(--line); border-radius:999px; background:#fff; font-size:12px; white-space:nowrap}
+  .chips{display:flex; gap:6px; flex-wrap:wrap}
+  .statline{display:flex; align-items:center; gap:10px; flex-wrap:wrap}
+  .bar{height:10px; width:100%; background:#eef2f7; border-radius:999px; overflow:hidden}
+  .bar > span{display:block; height:100%}
+  .bar .good{background:var(--good)}
+  .bar .neutral{background:var(--neutral)}
+  .bar .bad{background:var(--bad)}
+  .kpi{display:flex; gap:12px; flex-wrap:wrap}
+  .kpi .box{background:#fff; border:1px solid var(--line); border-radius:10px; padding:8px 10px; min-width:110px}
+  .badge{padding:2px 8px; border-radius:999px; font-size:12px; border:1px solid var(--line); background:#fff}
+  .badge.up{color:var(--good); border-color:#c7f8e9; background:#eafff7}
+  .badge.down{color:var(--bad); border-color:#ffc7c7; background:#fff0f0}
+  .chartBox{width:100%; max-width:360px; margin:auto; position:relative}
+  .chartBox canvas{width:100% !important; height:220px !important; display:block}
   .chartBox.small canvas{height:160px !important}
-  .toolbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:8px 0}
-  input[type="range"]{width:190px}
-  .legend{display:flex;gap:10px;flex-wrap:wrap;margin-top:6px}
-  .dot{width:10px;height:10px;border-radius:999px;display:inline-block;margin-right:6px}
-  .hr{height:1px;background:var(--line);margin:16px 0}
+  .right{margin-left:auto}
+  .hint{font-size:12px; color:#6b7280}
 </style>
 </head>
 <body>
 <header>
-  <h1>Coach del Tempo — Preview</h1>
-  <div class="toolbar">
-    <label class="mini">Soglia “spreco” (Entertainment tollerato): <span id="tolLabel" class="pill">20%</span></label>
-    <input id="tol" type="range" min="0" max="40" value="20" step="5" />
-    <select id="trendRange">
-      <option value="7">Ultimi 7 giorni</option>
-      <option value="28">Ultime 4 settimane</option>
-      <option value="365">Ultimi 12 mesi</option>
-    </select>
-  </div>
+  <h1>Dashboard Semplice — 3 Opzioni visive</h1>
 </header>
 
 <div class="wrap">
-  <!-- KPI -->
-  <div class="grid cards">
-    <div class="card">
-      <div class="mini">Tempo disponibile oggi</div>
-      <div class="lead" id="kpiAvailToday">—</div>
-      <div class="mini">Non gestibile: Sleep/Work/Survive/Slavery</div>
-    </div>
-    <div class="card">
-      <div class="mini">Usato bene oggi</div>
-      <div class="lead" id="kpiGoodToday">—</div>
-      <div class="mini">Focus score: <b id="kpiFocusToday">—</b></div>
-    </div>
-    <div class="card">
-      <div class="mini">Ieri — uso del tempo disponibile</div>
-      <div class="kpiRow">
-        <span class="pill" id="yGood">— bene</span>
-        <span class="pill" id="yNeutral">— neutro</span>
-        <span class="pill" id="yWaste">— spreco</span>
-      </div>
-      <div class="feedback" id="yFeedback"></div>
-    </div>
-    <div class="card">
-      <div class="mini">Streak obiettivo (≥ 60% bene)</div>
-      <div class="lead" id="kpiStreak">—</div>
-      <div class="mini">Trend “bene/disp.” ultimi 7 giorni: <span id="kpiTrendDelta" class="delta">—</span></div>
-    </div>
-  </div>
 
-  <!-- Donut oggi/ieri -->
-  <div class="row" style="margin-top:6px">
-    <div class="col">
-      <div class="card">
-        <div class="mini">Oggi — come stai usando il tempo disponibile</div>
-        <div class="chartBox"><canvas id="donutToday"></canvas></div>
-        <div class="legend">
-          <span><span class="dot" style="background:var(--good)"></span>Bene</span>
-          <span><span class="dot" style="background:var(--neutral)"></span>Neutro</span>
-          <span><span class="dot" style="background:var(--bad)"></span>Spreco</span>
+  <!-- ===================== OPZIONE 1 ===================== -->
+  <section class="block">
+    <h2 class="title">Opzione 1 — “Colpo d’occhio singolo” (un solo grafico + numeri chiave)</h2>
+    <div class="row">
+      <div class="col">
+        <div class="mini">Oggi — come sta andando</div>
+        <div class="chartBox"><canvas id="o1_donutToday"></canvas></div>
+        <div class="statline" style="margin-top:8px">
+          <span class="chip">Rimanente: <b id="o1_remaining">—</b></span>
+          <span class="chip">Disponibile: <b id="o1_avail">—</b></span>
+          <span class="chip">Focus: <b id="o1_focus">—%</b></span>
+        </div>
+        <div class="bar" style="margin-top:10px">
+          <span class="good" id="o1_goodBar" style="width:0%"></span>
+          <span class="neutral" id="o1_neutralBar" style="width:0%"></span>
+          <span class="bad" id="o1_badBar" style="width:0%"></span>
+        </div>
+        <div class="hint">Barra = utilizzo del tempo <b>disponibile</b> (verde/bene, giallo/neutro, rosso/spreco)</div>
+      </div>
+
+      <div class="col">
+        <div class="kpi">
+          <div class="box">
+            <div class="mini">Ieri — focus</div>
+            <div class="lead" id="o1_yFocus">—%</div>
+            <div class="mini">Delta vs oggi: <span id="o1_delta" class="badge">—</span></div>
+          </div>
+          <div class="box">
+            <div class="mini">Settimana (finora)</div>
+            <div class="lead" id="o1_weekFocus">—%</div>
+            <div class="mini">Spreco: <b id="o1_weekWaste">—%</b></div>
+          </div>
+          <div class="box">
+            <div class="mini">Tolleranza “Entertainment”</div>
+            <div class="lead" id="o1_tol">20%</div>
+            <div class="mini">Oltre soglia → rosso</div>
+          </div>
+        </div>
+        <div class="chips" style="margin-top:8px">
+          <span class="chip">Top oggi: <b id="o1_top1">—</b></span>
+          <span class="chip">Secondo: <b id="o1_top2">—</b></span>
         </div>
       </div>
     </div>
-    <div class="col">
-      <div class="card">
-        <div class="mini">Ieri — uso del tempo disponibile</div>
-        <div class="chartBox"><canvas id="donutYesterday"></canvas></div>
-      </div>
-    </div>
-  </div>
+  </section>
 
-  <!-- Trend -->
-  <div class="row">
-    <div class="col">
-      <div class="card">
-        <div class="mini">Trend Focus score (bene / disponibile)</div>
-        <div class="chartBox small"><canvas id="trendFocus"></canvas></div>
+  <!-- ===================== OPZIONE 2 ===================== -->
+  <section class="block">
+    <h2 class="title">Opzione 2 — “Oggi vs Ieri” (due mini donut + indicatori)</h2>
+    <div class="row">
+      <div class="col">
+        <div class="mini">Oggi</div>
+        <div class="chartBox small"><canvas id="o2_today"></canvas></div>
+        <div class="chips">
+          <span class="chip">Rim.: <b id="o2_rem">—</b></span>
+          <span class="chip">Focus: <b id="o2_focus">—%</b></span>
+        </div>
+      </div>
+      <div class="col">
+        <div class="mini">Ieri</div>
+        <div class="chartBox small"><canvas id="o2_yesterday"></canvas></div>
+        <div class="chips">
+          <span class="chip">Focus ieri: <b id="o2_yFocus">—%</b></span>
+          <span class="chip">Delta: <b id="o2_delta" class="badge">—</b></span>
+        </div>
+      </div>
+      <div class="col">
+        <div class="mini">Settimana</div>
+        <div class="chartBox small"><canvas id="o2_weekTrend"></canvas></div>
+        <div class="chips">
+          <span class="chip">Spreco 7gg: <b id="o2_waste7">—%</b></span>
+          <span class="chip">Miglioramento 7gg: <b id="o2_impr7" class="badge">—</b></span>
+        </div>
       </div>
     </div>
-    <div class="col">
-      <div class="card">
-        <div class="mini">Stack giornaliero — bene / neutro / spreco (ultimi giorni)</div>
-        <div class="chartBox small"><canvas id="stackDays"></canvas></div>
-      </div>
-    </div>
-  </div>
+  </section>
 
-  <div class="hr"></div>
-  <div class="mini">
-    <b>Definizioni (mock):</b> non gestibile = Sleep/Work/Survive/Slavery.  
-    Bene = Study/Productivity/Book/Chinese/Gym/Bike/Chess.  
-    Neutro = Entertainment/Holiday/Nut.  
-    Spreco = Waste + eventuale <i>Entertainment</i> che supera la soglia.  
-    Focus score = minuti “bene” / tempo disponibile.
-  </div>
+  <!-- ===================== OPZIONE 3 ===================== -->
+  <section class="block">
+    <h2 class="title">Opzione 3 — “Trend semplice” (una linea + tre capsule)</h2>
+    <div class="row">
+      <div class="col">
+        <div class="mini">Focus giornaliero (ultimi 28 giorni)</div>
+        <div class="chartBox small"><canvas id="o3_trend"></canvas></div>
+      </div>
+      <div class="col" style="display:flex; flex-direction:column; gap:8px">
+        <div class="chip">7 giorni — Δ: <b id="o3_d7" class="badge">—</b></div>
+        <div class="chip">30 giorni — Δ: <b id="o3_d30" class="badge">—</b></div>
+        <div class="chip">12 mesi — Δ: <b id="o3_d365" class="badge">—</b></div>
+        <div class="mini">Verde = in miglioramento; Rosso = peggioramento. Obiettivo: ridurre “doomscrolling” (spreco).</div>
+      </div>
+    </div>
+  </section>
+
 </div>
 
 <script>
-/* ====== TAG BUCKETS & MOCK DATA ====== */
-const NON_LIBERI = ['Sleep','Work','Survive','Slavery'];
-const GOOD = ['Study','Productivity','Book','Chinese','Gym','Bike','Chess'];
-const NEUTRAL = ['Entertainment','Holiday','Nut'];
-const WASTE = ['Waste'];
+/* =================== CATEGORIE & DATI MOCK =================== */
+const NON_G = ['Sleep','Work','Survive','Slavery']; // non gestibile
+const GOOD = ['Study','Productivity','Book','Chinese','Gym','Bike','Chess']; // bene
+const NEUT = ['Entertainment','Holiday','Nut']; // neutro
+const WAST = ['Waste']; // spreco
 
-const DAY_MOCK = {
-  // Ogni elemento: [tag, minuti]
-  today: [
-    ['Sleep',450], ['Survive',40], ['Work',460], ['Study',120], ['Productivity',60],
-    ['Entertainment',70], ['Gym',60], ['Waste',20], ['Book',30], ['Chinese',30], ['Bike',20]
-  ],
-  yesterday: [
-    ['Sleep',460], ['Survive',30], ['Work',480], ['Study',60], ['Productivity',45],
-    ['Entertainment',120], ['Waste',40], ['Book',20], ['Gym',30]
-  ]
-};
+// Soglia “Entertainment” tollerato sul tempo disponibile (mock fisso 20%)
+const TOL = 20;
 
-// Trend (finto): array di giorni con triplette [bene, neutro, spreco] (minuti) e “disponibile”
-const TREND_MOCK = Array.from({length: 30}, (_,i)=> {
-  const baseAvail = 24*60 - (450 + 40 + 460 + (i%3?0:20)); // piccole variazioni
-  const good = Math.max(0, Math.round(0.55*baseAvail + ((i%5)-2)*10));
-  const neutral = Math.max(0, Math.round(0.25*baseAvail + ((i%7)-3)*6));
+// Dati esempio “oggi” e “ieri” (tag, minuti)
+const TODAY = [
+  ['Sleep',450], ['Survive',40], ['Work',460],
+  ['Study',120], ['Productivity',60], ['Entertainment',70],
+  ['Gym',60], ['Waste',20], ['Book',30], ['Chinese',30], ['Bike',20]
+];
+const YESTERDAY = [
+  ['Sleep',460], ['Survive',30], ['Work',480],
+  ['Study',60], ['Productivity',45], ['Entertainment',120],
+  ['Waste',40], ['Book',20], ['Gym',30]
+];
+
+// Trend 28 giorni (minuti bene/neutro/spreco + disponibile)
+const TREND = Array.from({length: 365}, (_,i)=>{
+  const baseAvail = 24*60 - (450 + 40 + 460 + (i%5?0:15));
+  const good = Math.max(0, Math.round(0.52*baseAvail + ((i%7)-3)*8));
+  const neutral = Math.max(0, Math.round(0.26*baseAvail + ((i%11)-5)*5));
   const waste = Math.max(0, baseAvail - good - neutral);
   return {good, neutral, waste, avail: baseAvail};
 });
 
-/* ====== UTILS ====== */
+/* =================== UTILS =================== */
 const $ = s => document.querySelector(s);
 const fmtHM = m => `${Math.floor(m/60)}h ${String(m%60).padStart(2,'0')}m`;
-const sum = arr => arr.reduce((a,b)=>a+b,0);
-
-function splitBuckets(dayArray, tolerancePct) {
-  const totals = {nonGest:0, good:0, neutral:0, waste:0, avail:0};
-
-  let entertainment = 0;
-  for (const [tag, min] of dayArray) {
-    if (NON_LIBERI.includes(tag)) totals.nonGest += min;
-    else if (GOOD.includes(tag)) totals.good += min;
-    else if (NEUTRAL.includes(tag)) {
-      if (tag === 'Entertainment') entertainment += min;
-      else totals.neutral += min;
-    } else if (WASTE.includes(tag)) totals.waste += min;
-    else totals.neutral += min; // fallback
+function sum(arr){return arr.reduce((a,b)=>a+b,0)}
+function split(day){
+  const t = {non:0, good:0, neut:0, wast:0, avail:0, ent:0};
+  for (const [tag,min] of day){
+    if (NON_G.includes(tag)) t.non += min;
+    else if (GOOD.includes(tag)) t.good += min;
+    else if (NEUT.includes(tag)) { if (tag==='Entertainment') t.ent += min; else t.neut += min; }
+    else if (WAST.includes(tag)) t.wast += min;
+    else t.neut += min;
   }
-  totals.avail = Math.max(0, 24*60 - totals.nonGest);
-
-  // Entertainment: neutro fino alla soglia, eccesso → waste
-  const allowed = Math.round(totals.avail * tolerancePct / 100);
-  const entNeutral = Math.min(entertainment, allowed);
-  const entOverflow = Math.max(0, entertainment - allowed);
-  totals.neutral += entNeutral;
-  totals.waste += entOverflow;
-
-  return totals;
+  t.avail = Math.max(0, 24*60 - t.non);
+  const allowed = Math.round(t.avail * TOL / 100);
+  const entNeutral = Math.min(t.ent, allowed);
+  const entOverflow = Math.max(0, t.ent - allowed);
+  t.neut += entNeutral;
+  t.wast += entOverflow;
+  return t;
+}
+function focusScore(t){ return t.avail ? Math.round(100 * t.good / t.avail) : 0; }
+function percent(n, tot){ return tot>0 ? Math.round(100*n/tot) : 0; }
+function top2(day){
+  const m = new Map();
+  for (const [tag, min] of day){
+    if (NON_G.includes(tag)) continue; // fuori da “disponibile”
+    m.set(tag, (m.get(tag)||0) + min);
+  }
+  return [...m.entries()].sort((a,b)=>b[1]-a[1]).slice(0,2).map(([k,v])=>`${k} ${Math.round(v/60)}h`);
+}
+function deltaBadge(el, d){
+  el.textContent = (d>=0?`+${d}%`:`${d}%`);
+  el.className = 'badge ' + (d>=0? 'up':'down');
 }
 
-/* ====== CHARTS ====== */
-let donutToday, donutYesterday, trendFocus, stackDays;
+/* =================== OPZIONE 1 =================== */
+let o1Donut;
+function renderO1(){
+  const t = split(TODAY);
+  const y = split(YESTERDAY);
 
-function renderAll(){
-  const tol = Number($('#tol').value);
-  $('#tolLabel').textContent = tol + '%';
-
-  // Oggi
-  const T = splitBuckets(DAY_MOCK.today, tol);
-  $('#kpiAvailToday').textContent = fmtHM(T.avail);
-  $('#kpiGoodToday').textContent = fmtHM(T.good);
-  const focusToday = T.avail ? Math.round((T.good/T.avail)*100) : 0;
-  $('#kpiFocusToday').textContent = focusToday + '%';
-
-  donutToday = makeDonut(donutToday, 'donutToday', T);
-
-  // Ieri
-  const Y = splitBuckets(DAY_MOCK.yesterday, tol);
-  $('#yGood').textContent   = fmtHM(Y.good)   + ' bene';
-  $('#yNeutral').textContent= fmtHM(Y.neutral)+ ' neutro';
-  $('#yWaste').textContent  = fmtHM(Y.waste)  + ' spreco';
-  donutYesterday = makeDonut(donutYesterday, 'donutYesterday', Y);
-
-  // Feedback ieri
-  const fb = [];
-  const yFocus = Y.avail ? (Y.good/Y.avail) : 0;
-  if (yFocus >= 0.6) fb.push(`<span class="fb good">👍 Ottimo focus (${Math.round(yFocus*100)}%)</span>`);
-  else if (yFocus >= 0.45) fb.push(`<span class="fb warn">⚠️ Focus discreto (${Math.round(yFocus*100)}%)</span>`);
-  else fb.push(`<span class="fb bad">🔻 Basso focus (${Math.round(yFocus*100)}%)</span>`);
-  if (Y.waste > Y.neutral) fb.push(`<span class="fb bad">🧯 Spreco alto: ${fmtHM(Y.waste)}</span>`);
-  if (Y.neutral > Y.good) fb.push(`<span class="fb warn">🎭 Troppo neutro rispetto al bene</span>`);
-  $('#yFeedback').innerHTML = fb.join(' ');
-
-  // Trend range
-  const range = Number($('#trendRange').value);
-  const slice = TREND_MOCK.slice(-range);
-  const focusSeries = slice.map(d => d.avail ? Math.round(100*d.good/d.avail) : 0);
-  const delta = focusSeries.at(-1) - focusSeries[0];
-  $('#kpiTrendDelta').textContent = (delta>=0?`▲ +${delta}%`:`▼ ${delta}%`);
-  $('#kpiTrendDelta').className = 'delta ' + (delta>=0?'up':'down');
-
-  // Streak (≥ 60% bene)
-  $('#kpiStreak').textContent = calcStreak(focusSeries, 60) + ' giorni';
-
-  trendFocus = makeLine(trendFocus, 'trendFocus', focusSeries);
-  stackDays  = makeStack(stackDays, 'stackDays', slice);
-}
-
-function calcStreak(arr, threshold){
-  let s=0; for (let i=arr.length-1;i>=0;i--){ if (arr[i] >= threshold) s++; else break; } return s;
-}
-
-function makeDonut(instance, id, totals){
-  const ctx = document.getElementById(id).getContext('2d');
-  if (instance) instance.destroy();
-  const data = [totals.good, totals.neutral, totals.waste];
-  return new Chart(ctx, {
-    type: 'doughnut',
-    data: { labels:['Bene','Neutro','Spreco'], datasets:[{ data, backgroundColor:['#10b981','#f59e0b','#ef4444'] }] },
-    options: {
-      responsive: true, maintainAspectRatio: false, cutout: '60%',
-      plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 11 } } } }
+  // Donut “Bene/Neutro/Spreco” sul tempo disponibile di OGGI
+  const ctx = document.getElementById('o1_donutToday').getContext('2d');
+  if (o1Donut) o1Donut.destroy();
+  o1Donut = new Chart(ctx, {
+    type:'doughnut',
+    data:{ labels:['Bene','Neutro','Spreco'],
+      datasets:[{ data:[t.good,t.neut,t.wast], backgroundColor:['#10b981','#f59e0b','#ef4444'] }] },
+    options:{ responsive:true, maintainAspectRatio:false, cutout:'60%',
+      plugins:{ legend:{ position:'bottom', labels:{ boxWidth:10, font:{ size:11 } } } }
     }
   });
+
+  // Numeri chiave/Barre
+  const used = t.good + t.neut + t.wast;
+  const rem = Math.max(0, t.avail - used);
+  $('#o1_remaining').textContent = fmtHM(rem);
+  $('#o1_avail').textContent = fmtHM(t.avail);
+  $('#o1_focus').textContent = focusScore(t) + '%';
+  const gP = percent(t.good, t.avail), nP = percent(t.neut, t.avail), wP = percent(t.wast, t.avail);
+  $('#o1_goodBar').style.width = gP + '%';
+  $('#o1_neutralBar').style.width = (gP+nP) + '%';
+  $('#o1_badBar').style.width = (gP+nP+wP) + '%';
+
+  // Ieri / Settimana / Tolleranza
+  const yF = focusScore(y);
+  $('#o1_yFocus').textContent = yF + '%';
+  deltaBadge($('#o1_delta'), focusScore(t)-yF);
+
+  // “Settimana (finora)” → media focus ultimi 7 e % spreco su disponibile
+  const week = TREND.slice(-7);
+  const fList = week.map(d=> d.avail? Math.round(100*d.good/d.avail) : 0);
+  const avgF = Math.round(sum(fList)/fList.length);
+  const wPct = Math.round(100*sum(week.map(d=>d.waste))/sum(week.map(d=>d.avail)));
+  $('#o1_weekFocus').textContent = `${avgF}%`;
+  $('#o1_weekWaste').textContent = `${wPct}%`;
+  $('#o1_tol').textContent = `${TOL}%`;
+
+  const [a,b] = top2(TODAY);
+  $('#o1_top1').textContent = a||'—';
+  $('#o1_top2').textContent = b||'—';
 }
-function makeLine(instance, id, values){
-  const ctx = document.getElementById(id).getContext('2d');
-  if (instance) instance.destroy();
-  return new Chart(ctx,{
+
+/* =================== OPZIONE 2 =================== */
+let o2Today, o2Yest, o2Trend;
+function renderO2(){
+  const t = split(TODAY), y = split(YESTERDAY);
+
+  // Today donut
+  if (o2Today) o2Today.destroy();
+  o2Today = new Chart(document.getElementById('o2_today').getContext('2d'), {
+    type:'doughnut',
+    data:{ labels:['Bene','Neutro','Spreco'], datasets:[{ data:[t.good,t.neut,t.wast], backgroundColor:['#10b981','#f59e0b','#ef4444'] }]},
+    options:{ responsive:true, maintainAspectRatio:false, cutout:'60%', plugins:{legend:{display:false}} }
+  });
+  const used = t.good+t.neut+t.wast, rem = Math.max(0, t.avail - used);
+  $('#o2_rem').textContent = fmtHM(rem);
+  $('#o2_focus').textContent = focusScore(t) + '%';
+
+  // Yesterday donut
+  if (o2Yest) o2Yest.destroy();
+  o2Yest = new Chart(document.getElementById('o2_yesterday').getContext('2d'), {
+    type:'doughnut',
+    data:{ labels:['Bene','Neutro','Spreco'], datasets:[{ data:[y.good,y.neut,y.wast], backgroundColor:['#10b981','#f59e0b','#ef4444'] }]},
+    options:{ responsive:true, maintainAspectRatio:false, cutout:'60%', plugins:{legend:{display:false}} }
+  });
+  $('#o2_yFocus').textContent = focusScore(y) + '%';
+  deltaBadge($('#o2_delta'), focusScore(t)-focusScore(y));
+
+  // Week sparkline (focus giornaliero 7gg)
+  const week = TREND.slice(-7);
+  const fList = week.map(d=> d.avail? Math.round(100*d.good/d.avail) : 0);
+  if (o2Trend) o2Trend.destroy();
+  o2Trend = new Chart(document.getElementById('o2_weekTrend').getContext('2d'), {
     type:'line',
-    data:{ labels: values.map((_,i)=>i+1), datasets:[{ data: values, tension:.3, pointRadius:0, borderWidth:2 }]},
+    data:{ labels:fList.map((_,i)=>i+1), datasets:[{ data:fList, tension:.3, pointRadius:0, borderWidth:2 }]},
     options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{ y:{ beginAtZero:true, max:100 } } }
   });
+  const wastePct7 = Math.round(100*sum(week.map(d=>d.waste))/sum(week.map(d=>d.avail)));
+  $('#o2_waste7').textContent = wastePct7 + '%';
+  const delta7 = fList.at(-1) - fList[0];
+  deltaBadge($('#o2_impr7'), delta7);
 }
-function makeStack(instance, id, days){
-  const labels = days.map((_,i)=>i+1);
-  const good = days.map(d=>d.good);
-  const neutral = days.map(d=>d.neutral);
-  const waste = days.map(d=>d.waste);
-  const ctx = document.getElementById(id).getContext('2d');
-  if (instance) instance.destroy();
-  return new Chart(ctx,{
-    type:'bar',
-    data:{
-      labels,
-      datasets:[
-        {label:'Bene', data:good,   stack:'t', backgroundColor:'#10b981'},
-        {label:'Neutro', data:neutral, stack:'t', backgroundColor:'#f59e0b'},
-        {label:'Spreco', data:waste, stack:'t', backgroundColor:'#ef4444'}
-      ]
-    },
-    options:{
-      responsive:true, maintainAspectRatio:false,
-      plugins:{ legend:{ position:'bottom', labels:{ boxWidth:10, font:{ size:11 } } } },
-      scales:{ x:{ stacked:true }, y:{ stacked:true, beginAtZero:true } }
-    }
+
+/* =================== OPZIONE 3 =================== */
+let o3Trend;
+function renderO3(){
+  const last28 = TREND.slice(-28);
+  const f28 = last28.map(d=> d.avail? Math.round(100*d.good/d.avail) : 0);
+  if (o3Trend) o3Trend.destroy();
+  o3Trend = new Chart(document.getElementById('o3_trend').getContext('2d'), {
+    type:'line',
+    data:{ labels:f28.map((_,i)=>i+1), datasets:[{ data:f28, tension:.3, pointRadius:0, borderWidth:2 }]},
+    options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{ y:{ beginAtZero:true, max:100 } } }
   });
+
+  // Capsule Δ su 7 / 30 / 365 (usando serie TREND)
+  const d7  = deltaWindow(7),  d30 = deltaWindow(30), d365 = deltaWindow(365);
+  deltaBadge($('#o3_d7'), d7);
+  deltaBadge($('#o3_d30'), d30);
+  deltaBadge($('#o3_d365'), d365);
+}
+function deltaWindow(n){
+  const s = TREND.slice(-n);
+  const f = s.map(d=> d.avail? Math.round(100*d.good/d.avail) : 0);
+  return f.at(-1) - f[0];
 }
 
-/* EVENTS */
-document.getElementById('tol').addEventListener('input', renderAll);
-document.getElementById('trendRange').addEventListener('change', renderAll);
-
-/* BOOT */
-renderAll();
+/* =================== BOOT =================== */
+renderO1(); renderO2(); renderO3();
 </script>
 </body>
 </html>
