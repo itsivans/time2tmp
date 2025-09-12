@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>t33 — Dashboard Semplice (live)</title>
+<title>t33 — Dashboard Semplice (live, con date)</title>
 
 <!-- Chart.js -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -22,8 +22,13 @@
   body{margin:0; font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial; background:var(--bg); color:var(--text)}
   header{padding:12px 16px; border-bottom:1px solid var(--line); display:flex; align-items:center; gap:10px; flex-wrap:wrap}
   header h1{margin:0; font-size:18px; font-weight:800}
-  header .muted{margin-left:auto; font-size:12px; color:var(--muted)}
-  .wrap{padding:14px 16px; display:grid; gap:18px}
+  .muted{font-size:12px; color:var(--muted)}
+  .wrap{padding:14px 16px; display:grid; gap:16px}
+  .toolbar{display:flex; gap:8px; align-items:center; flex-wrap:wrap}
+  .toolbar input[type="date"], .toolbar select{padding:8px 10px; border:1px solid var(--line); border-radius:8px; font-size:14px}
+  .btn{padding:8px 12px; border-radius:8px; border:1px solid var(--line); background:#fff; cursor:pointer; font-size:14px}
+  .btn.primary{background:#1e88e5; color:#fff; border-color:#1e88e5}
+  a.btnlink{color:#fff; background:#2196f3; padding:8px 10px; border-radius:8px; text-decoration:none; font-size:14px}
   .block{border:1px solid var(--line); border-radius:12px; background:var(--card); padding:12px}
   .title{margin:0 0 8px; font-size:16px; font-weight:800}
   .mini{font-size:12px; color:var(--muted)}
@@ -46,108 +51,124 @@
   .chartBox canvas{width:100% !important; height:220px !important; display:block}
   .chartBox.small canvas{height:160px !important}
   #loading{padding:8px 16px; font-size:14px; color:#555}
-  a.btn{color:#fff; background:#2196f3; padding:8px 10px; border-radius:8px; text-decoration:none; font-size:14px}
 </style>
 </head>
 <body>
 <header>
   <h1>Dashboard Semplice — live</h1>
   <span class="muted" id="userLabel">—</span>
-  <a href="index.html" class="btn">↩︎ Inserimento</a>
+  <a href="index.html" class="btnlink">↩︎ Inserimento</a>
 </header>
 
-<div id="loading">Caricamento…</div>
+<div class="wrap">
+  <!-- CONTROLLI DATA/RANGE -->
+  <div class="toolbar">
+    <span class="muted">Giorno base:</span>
+    <input type="date" id="baseDate">
+    <span class="muted">Confronta con:</span>
+    <input type="date" id="cmpDate">
+    <span class="muted">Trend:</span>
+    <select id="trendLen">
+      <option value="7">Ultimi 7</option>
+      <option value="28" selected>Ultimi 28</option>
+      <option value="90">Ultimi 90</option>
+      <option value="365">Ultimi 365</option>
+    </select>
+    <button class="btn primary" id="applyBtn">Applica</button>
+    <span class="muted" id="loading" style="margin-left:auto">Caricamento…</span>
+  </div>
 
-<div class="wrap" id="app" style="display:none">
+  <div id="app" style="display:none">
 
-  <!-- ===================== OPZIONE 1 ===================== -->
-  <section class="block">
-    <h2 class="title">Opzione 1 — “Colpo d’occhio singolo”</h2>
-    <div class="row">
-      <div class="col">
-        <div class="mini">Oggi — come sta andando</div>
-        <div class="chartBox"><canvas id="o1_donutToday"></canvas></div>
-        <div class="chips" style="margin-top:8px">
-          <span class="chip">Rimanente oggi (tempo fino a mezzanotte): <b id="o1_remaining">—</b></span>
-          <span class="chip">Disponibile (stimato): <b id="o1_avail">—</b></span>
-          <span class="chip">Focus: <b id="o1_focus">—%</b></span>
-        </div>
-        <div class="bar" style="margin-top:10px">
-          <span class="good" id="o1_goodBar" style="width:0%"></span>
-          <span class="neutral" id="o1_neutralBar" style="width:0%"></span>
-          <span class="bad" id="o1_badBar" style="width:0%"></span>
-        </div>
-        <div class="mini">Barra = utilizzo del tempo <b>disponibile</b> (verde/bene, giallo/neutro, rosso/spreco)</div>
-      </div>
-
-      <div class="col">
-        <div class="kpi">
-          <div class="box">
-            <div class="mini">Ieri — focus</div>
-            <div class="lead" id="o1_yFocus">—%</div>
-            <div class="mini">Delta vs oggi: <span id="o1_delta" class="badge">—</span></div>
+    <!-- ===================== OPZIONE 1 ===================== -->
+    <section class="block">
+      <h2 class="title">Opzione 1 — “Colpo d’occhio singolo”</h2>
+      <div class="row">
+        <div class="col">
+          <div class="mini">Giorno base: <b id="labelBase">—</b> — come sta andando</div>
+          <div class="chartBox"><canvas id="o1_donutToday"></canvas></div>
+          <div class="chips" style="margin-top:8px">
+            <span class="chip">Rimanente (se oggi): <b id="o1_remaining">—</b></span>
+            <span class="chip">Disponibile (stimato): <b id="o1_avail">—</b></span>
+            <span class="chip">Focus: <b id="o1_focus">—%</b></span>
           </div>
-          <div class="box">
-            <div class="mini">Settimana (ultimi 7 giorni)</div>
-            <div class="lead" id="o1_weekFocus">—%</div>
-            <div class="mini">Spreco 7gg: <b id="o1_weekWaste">—%</b></div>
+          <div class="bar" style="margin-top:10px">
+            <span class="good" id="o1_goodBar" style="width:0%"></span>
+            <span class="neutral" id="o1_neutralBar" style="width:0%"></span>
+            <span class="bad" id="o1_badBar" style="width:0%"></span>
           </div>
-          <div class="box">
-            <div class="mini">Tolleranza “Entertainment”</div>
-            <div class="lead" id="o1_tol">20%</div>
-            <div class="mini">Oltre soglia → rosso</div>
+          <div class="mini">Barra = utilizzo del tempo <b>disponibile</b> (verde/bene, giallo/neutro, rosso/spreco)</div>
+        </div>
+
+        <div class="col">
+          <div class="kpi">
+            <div class="box">
+              <div class="mini">Giorno confronto: <b id="labelCmp">—</b> — focus</div>
+              <div class="lead" id="o1_yFocus">—%</div>
+              <div class="mini">Delta vs base: <span id="o1_delta" class="badge">—</span></div>
+            </div>
+            <div class="box">
+              <div class="mini">Media focus (fino al base)</div>
+              <div class="lead" id="o1_weekFocus">—%</div>
+              <div class="mini">Spreco (finestra): <b id="o1_weekWaste">—%</b></div>
+            </div>
+            <div class="box">
+              <div class="mini">Tolleranza “Entertainment”</div>
+              <div class="lead" id="o1_tol">20%</div>
+              <div class="mini">Oltre soglia → rosso</div>
+            </div>
+          </div>
+          <div class="chips" style="margin-top:8px">
+            <span class="chip">Top: <b id="o1_top1">—</b></span>
+            <span class="chip">Secondo: <b id="o1_top2">—</b></span>
           </div>
         </div>
-        <div class="chips" style="margin-top:8px">
-          <span class="chip">Top oggi: <b id="o1_top1">—</b></span>
-          <span class="chip">Secondo: <b id="o1_top2">—</b></span>
-        </div>
       </div>
-    </div>
-  </section>
+    </section>
 
-  <!-- ===================== OPZIONE 2 ===================== -->
-  <section class="block">
-    <h2 class="title">Opzione 2 — “Oggi vs Ieri”</h2>
-    <div class="row">
-      <div class="col">
-        <div class="mini">Oggi</div>
-        <div class="chartBox small"><canvas id="o2_today"></canvas></div>
-        <div class="chips">
-          <span class="chip">Focus: <b id="o2_focus">—%</b></span>
+    <!-- ===================== OPZIONE 2 ===================== -->
+    <section class="block">
+      <h2 class="title">Opzione 2 — “Giorno A vs Giorno B”</h2>
+      <div class="row">
+        <div class="col">
+          <div class="mini">Giorno A: <b id="labelA">—</b></div>
+          <div class="chartBox small"><canvas id="o2_today"></canvas></div>
+          <div class="chips">
+            <span class="chip">Focus: <b id="o2_focus">—%</b></span>
+          </div>
+        </div>
+        <div class="col">
+          <div class="mini">Giorno B: <b id="labelB">—</b></div>
+          <div class="chartBox small"><canvas id="o2_yesterday"></canvas></div>
+          <div class="chips">
+            <span class="chip">Focus B: <b id="o2_yFocus">—%</b></span>
+            <span class="chip">Delta A−B: <b id="o2_delta" class="badge">—</b></span>
+          </div>
+        </div>
+        <div class="col">
+          <div class="mini">Trend focus (ultimi <span id="labelTrendLen">—</span> giorni, fino al Giorno A)</div>
+          <div class="chartBox small"><canvas id="o2_weekTrend"></canvas></div>
         </div>
       </div>
-      <div class="col">
-        <div class="mini">Ieri</div>
-        <div class="chartBox small"><canvas id="o2_yesterday"></canvas></div>
-        <div class="chips">
-          <span class="chip">Focus ieri: <b id="o2_yFocus">—%</b></span>
-          <span class="chip">Delta: <b id="o2_delta" class="badge">—</b></span>
-        </div>
-      </div>
-      <div class="col">
-        <div class="mini">Settimana — focus giornaliero (7gg)</div>
-        <div class="chartBox small"><canvas id="o2_weekTrend"></canvas></div>
-      </div>
-    </div>
-  </section>
+    </section>
 
-  <!-- ===================== OPZIONE 3 ===================== -->
-  <section class="block">
-    <h2 class="title">Opzione 3 — “Trend semplice”</h2>
-    <div class="row">
-      <div class="col">
-        <div class="mini">Focus giornaliero (ultimi 28 giorni)</div>
-        <div class="chartBox small"><canvas id="o3_trend"></canvas></div>
+    <!-- ===================== OPZIONE 3 ===================== -->
+    <section class="block">
+      <h2 class="title">Opzione 3 — “Trend semplice”</h2>
+      <div class="row">
+        <div class="col">
+          <div class="mini">Focus giornaliero (ultimi <span id="labelTrendLen2">—</span> giorni, fino al Giorno A)</div>
+          <div class="chartBox small"><canvas id="o3_trend"></canvas></div>
+        </div>
+        <div class="col" style="display:flex; flex-direction:column; gap:8px">
+          <div class="chip">Δ 7 giorni: <b id="o3_d7" class="badge">—</b></div>
+          <div class="chip">Δ 30 giorni: <b id="o3_d30" class="badge">—</b></div>
+          <div class="chip">Δ 12 mesi: <b id="o3_d365" class="badge">—</b></div>
+          <div class="mini">Verde = miglioramento; Rosso = peggioramento. Obiettivo: ridurre “doomscrolling”.</div>
+        </div>
       </div>
-      <div class="col" style="display:flex; flex-direction:column; gap:8px">
-        <div class="chip">Δ 7 giorni: <b id="o3_d7" class="badge">—</b></div>
-        <div class="chip">Δ 30 giorni: <b id="o3_d30" class="badge">—</b></div>
-        <div class="chip">Δ 12 mesi: <b id="o3_d365" class="badge">—</b></div>
-        <div class="mini">Verde = miglioramento; Rosso = peggioramento. Obiettivo: ridurre “doomscrolling”.</div>
-      </div>
-    </div>
-  </section>
+    </section>
+  </div>
 </div>
 
 <script>
@@ -172,9 +193,9 @@ const NEUT  = ['Entertainment','Holiday','Nut']; // neutro
 const WAST  = ['Waste']; // spreco
 const TOL   = 20; // % Entertainment consentita sul tempo disponibile (oltre → spreco)
 
-// Helpers DOM/tempo
 const $ = s => document.querySelector(s);
 const fmtHM = m => `${Math.floor(m/60)}h ${String(m%60).padStart(2,'0')}m`;
+
 function todayLocalYMD(){
   const now = new Date();
   const tzOffset = -now.getTimezoneOffset();
@@ -190,35 +211,33 @@ function addDaysYMD(ymd, delta){
 }
 const dayStart = d => `${d}T00:00`;
 const dayEnd   = d => `${d}T23:59:59`;
-function minsUntilEndOfDay(){
+
+function minsUntilEndOfDayFor(ymd){
+  const today = todayLocalYMD();
+  if (ymd !== today) return null; // non oggi
   const now = new Date();
   const end = new Date(now); end.setHours(23,59,59,999);
   return Math.max(0, Math.round((end - now)/60000));
 }
 function userCol(uid){ return db.collection(`users/${uid}/activities`); }
 
-/* ===================== CORE: COSTRUZIONE EVENTI E AGGREGAZIONE ===================== */
+/* ===================== EVENT BUILDING / BUCKETS ===================== */
 function buildDayEvents(items, ymd, nextDayFirstTag) {
-  // items è già ordinato asc per timestamp; elementi: {tag, timestamp}
   const events = [];
   if (items.length > 0) {
     events.push({ tag: items[0].tag, timestamp: dayStart(ymd) });
     for (const it of items) events.push({ tag: it.tag, timestamp: it.timestamp });
     const lastTs = items[items.length-1].timestamp;
     const end = dayEnd(ymd);
-    if (lastTs < end) {
-      events.push({ tag: nextDayFirstTag || 'Sleep', timestamp: end });
-    } else {
-      events.push({ tag: items[items.length-1].tag, timestamp: end });
-    }
+    if (lastTs < end) events.push({ tag: nextDayFirstTag || 'Sleep', timestamp: end });
+    else events.push({ tag: items[items.length-1].tag, timestamp: end });
   } else {
-    // Nessun dato → tutto Sleep (non gestibile)
+    // Nessun dato → assumo tutto Sleep
     events.push({ tag:'Sleep', timestamp: dayStart(ymd) });
     events.push({ tag:'Sleep', timestamp: dayEnd(ymd) });
   }
   return events;
 }
-
 function minutesPerTagFromEvents(events) {
   const perTag = {};
   for (let i=1;i<events.length;i++){
@@ -231,7 +250,6 @@ function minutesPerTagFromEvents(events) {
   }
   return perTag;
 }
-
 function splitBuckets(perTag) {
   const totals = { non:0, good:0, neut:0, wast:0, avail:0, ent:0 };
   for (const [tag, min] of Object.entries(perTag)) {
@@ -249,7 +267,6 @@ function splitBuckets(perTag) {
   totals.wast += entOver;
   return totals;
 }
-
 function focusScore(t){ return t.avail ? Math.round(100 * t.good / t.avail) : 0; }
 function percent(n, tot){ return tot>0 ? Math.round(100*n/tot) : 0; }
 function top2FromPerTag(perTag){
@@ -260,7 +277,7 @@ function top2FromPerTag(perTag){
   return [a,b];
 }
 
-/* ===================== FETCH & AGGREGAZIONE FIRESTORE ===================== */
+/* ===================== FETCH FIRESTORE ===================== */
 async function fetchDay(uid, ymd) {
   const snap = await userCol(uid)
     .where('timestamp','>=',dayStart(ymd))
@@ -270,10 +287,8 @@ async function fetchDay(uid, ymd) {
   const items = []; snap.forEach(doc => items.push({ tag: doc.data().tag, timestamp: doc.data().timestamp }));
   return items;
 }
-
 async function dayBuckets(uid, ymd) {
   const items = await fetchDay(uid, ymd);
-  // trova primo tag del giorno successivo (per riempire il buco serale)
   const next = addDaysYMD(ymd, 1);
   const nextSnap = await userCol(uid)
     .where('timestamp','>=',dayStart(next))
@@ -284,28 +299,25 @@ async function dayBuckets(uid, ymd) {
   const totals = splitBuckets(perTag);
   return { perTag, totals };
 }
-
 async function rangeFocusSeries(uid, startYmd, endYmd) {
-  // prende tutte le attività nel range e raggruppa per giorno, poi calcola buckets giorno per giorno
   const snap = await userCol(uid)
     .where('timestamp','>=',dayStart(startYmd))
     .where('timestamp','<=',dayEnd(endYmd))
     .orderBy('timestamp')
     .get();
-  const byDate = new Map(); // ymd -> array items
+  const byDate = new Map(); // ymd -> array
   snap.forEach(doc => {
     const d = doc.data();
     const ymd = String(d.timestamp).slice(0,10);
     if (!byDate.has(ymd)) byDate.set(ymd, []);
     byDate.get(ymd).push({ tag:d.tag, timestamp:d.timestamp });
   });
-  // ordina items per giorno
   for (const arr of byDate.values()) arr.sort((a,b)=> (a.timestamp<b.timestamp?-1:1));
 
   const days = [];
   for (let d = startYmd; d <= endYmd; d = addDaysYMD(d,1)) days.push(d);
 
-  // mappa primo tag del giorno (per riempire)
+  // mappa primo tag del giorno
   const firstTagMap = {};
   for (const d of days) {
     const arr = byDate.get(d) || [];
@@ -314,7 +326,6 @@ async function rangeFocusSeries(uid, startYmd, endYmd) {
 
   const focus = [];
   let sumWaste = 0, sumAvail = 0;
-
   for (let i=0;i<days.length;i++){
     const d = days[i];
     const arr = byDate.get(d) || [];
@@ -326,136 +337,161 @@ async function rangeFocusSeries(uid, startYmd, endYmd) {
     sumWaste += totals.wast;
     sumAvail += totals.avail;
   }
-
   const wastePct = percent(sumWaste, sumAvail);
   return { focus, wastePct };
 }
 
-/* ===================== CHARTS STATE ===================== */
+/* ===================== CHART INSTANCES ===================== */
 let o1Donut, o2Today, o2Yest, o2Trend, o3Trend;
-
 function deltaBadge(el, d){
   el.textContent = (d>=0?`+${d}%`:`${d}%`);
   el.className = 'badge ' + (d>=0? 'up':'down');
 }
 
-/* ===================== RENDER OPZIONI ===================== */
+/* ===================== RENDER ===================== */
 async function renderAll(uid){
   const loading = $('#loading'), app = $('#app');
-  loading.style.display = 'block'; app.style.display = 'none';
+  loading.textContent = 'Caricamento…';
+  app.style.display = 'none';
 
   try {
-    const today = todayLocalYMD();
-    const yesterday = addDaysYMD(today, -1);
+    const base = $('#baseDate').value;
+    const cmp  = $('#cmpDate').value;
+    const trendLen = Number($('#trendLen').value);
 
-    // --- OGGI & IERI ---
-    const [{perTag:ptToday, totals:tToday}, {perTag:ptY, totals:tY}] = await Promise.all([
-      dayBuckets(uid, today),
-      dayBuckets(uid, yesterday)
+    $('#labelBase').textContent = base || '—';
+    $('#labelCmp').textContent  = cmp  || '—';
+    $('#labelA').textContent    = base || '—';
+    $('#labelB').textContent    = cmp  || '—';
+    $('#labelTrendLen').textContent  = trendLen;
+    $('#labelTrendLen2').textContent = trendLen;
+
+    if (!base) throw new Error('Seleziona il Giorno base.');
+    if (!cmp)  throw new Error('Seleziona il Giorno di confronto.');
+
+    // --- A (base) & B (cmp) ---
+    const [{perTag:ptA, totals:tA}, {perTag:ptB, totals:tB}] = await Promise.all([
+      dayBuckets(uid, base),
+      dayBuckets(uid, cmp)
     ]);
 
-    // O1: donut OGGI
+    // O1: donut Giorno base
     if (o1Donut) o1Donut.destroy();
     o1Donut = new Chart(document.getElementById('o1_donutToday').getContext('2d'), {
       type:'doughnut',
-      data:{ labels:['Bene','Neutro','Spreco'], datasets:[{ data:[tToday.good,tToday.neut,tToday.wast], backgroundColor:['#10b981','#f59e0b','#ef4444'] }] },
+      data:{ labels:['Bene','Neutro','Spreco'], datasets:[{ data:[tA.good,tA.neut,tA.wast], backgroundColor:['#10b981','#f59e0b','#ef4444'] }] },
       options:{ responsive:true, maintainAspectRatio:false, cutout:'60%', plugins:{ legend:{ position:'bottom', labels:{ boxWidth:10, font:{ size:11 } } } } }
     });
 
-    // O1: KPI oggi
-    $('#o1_remaining').textContent = fmtHM(minsUntilEndOfDay());
-    $('#o1_avail').textContent     = fmtHM(tToday.avail);
-    $('#o1_focus').textContent     = focusScore(tToday) + '%';
-    const gP = percent(tToday.good, tToday.avail),
-          nP = percent(tToday.neut, tToday.avail),
-          wP = percent(tToday.wast, tToday.avail);
+    // KPI base
+    const rem = minsUntilEndOfDayFor(base);
+    $('#o1_remaining').textContent = (rem===null ? '—' : fmtHM(rem));
+    $('#o1_avail').textContent     = fmtHM(tA.avail);
+    $('#o1_focus').textContent     = focusScore(tA) + '%';
+    const gP = percent(tA.good, tA.avail),
+          nP = percent(tA.neut, tA.avail),
+          wP = percent(tA.wast, tA.avail);
     $('#o1_goodBar').style.width   = gP + '%';
     $('#o1_neutralBar').style.width= (gP+nP) + '%';
     $('#o1_badBar').style.width    = (gP+nP+wP) + '%';
-    const [top1, top2] = top2FromPerTag(ptToday);
+    const [top1, top2] = top2FromPerTag(ptA);
     $('#o1_top1').textContent = top1;
     $('#o1_top2').textContent = top2;
 
-    // O1: Ieri focus e delta
-    const yF = focusScore(tY);
-    $('#o1_yFocus').textContent = yF + '%';
-    deltaBadge($('#o1_delta'), focusScore(tToday) - yF);
+    // Box confronto (A vs B)
+    const fB = focusScore(tB);
+    $('#o1_yFocus').textContent = fB + '%';
+    deltaBadge($('#o1_delta'), focusScore(tA) - fB);
     $('#o1_tol').textContent = `${TOL}%`;
 
-    // --- WEEK (7gg) ---
-    const start7 = addDaysYMD(today, -6);
-    const { focus:focus7, wastePct:waste7 } = await rangeFocusSeries(uid, start7, today);
-    const avg7 = Math.round(focus7.reduce((a,b)=>a+b,0) / (focus7.length || 1));
-    $('#o1_weekFocus').textContent = `${avg7}%`;
-    $('#o1_weekWaste').textContent = `${waste7}%`;
+    // --- Trend (finestra fino al Giorno base) ---
+    const startTrend = addDaysYMD(base, -(trendLen-1));
+    const { focus:focusN, wastePct:wasteN } = await rangeFocusSeries(uid, startTrend, base);
+    const avgN = Math.round((focusN.reduce((a,b)=>a+b,0) / (focusN.length || 1)) || 0);
+    $('#o1_weekFocus').textContent = `${avgN}%`;
+    $('#o1_weekWaste').textContent = `${wasteN}%`;
 
-    // O2: donut Today/Yesterday + sparkline 7gg
+    // O2: donut A / B + sparkline
     if (o2Today) o2Today.destroy();
     o2Today = new Chart(document.getElementById('o2_today').getContext('2d'), {
       type:'doughnut',
-      data:{ labels:['Bene','Neutro','Spreco'], datasets:[{ data:[tToday.good,tToday.neut,tToday.wast], backgroundColor:['#10b981','#f59e0b','#ef4444'] }] },
+      data:{ labels:['Bene','Neutro','Spreco'], datasets:[{ data:[tA.good,tA.neut,tA.wast], backgroundColor:['#10b981','#f59e0b','#ef4444'] }] },
       options:{ responsive:true, maintainAspectRatio:false, cutout:'60%', plugins:{legend:{display:false}} }
     });
-    $('#o2_focus').textContent = focusScore(tToday) + '%';
+    $('#o2_focus').textContent = focusScore(tA) + '%';
 
     if (o2Yest) o2Yest.destroy();
     o2Yest = new Chart(document.getElementById('o2_yesterday').getContext('2d'), {
       type:'doughnut',
-      data:{ labels:['Bene','Neutro','Spreco'], datasets:[{ data:[tY.good,tY.neut,tY.wast], backgroundColor:['#10b981','#f59e0b','#ef4444'] }] },
+      data:{ labels:['Bene','Neutro','Spreco'], datasets:[{ data:[tB.good,tB.neut,tB.wast], backgroundColor:['#10b981','#f59e0b','#ef4444'] }] },
       options:{ responsive:true, maintainAspectRatio:false, cutout:'60%', plugins:{legend:{display:false}} }
     });
-    $('#o2_yFocus').textContent = yF + '%';
-    deltaBadge($('#o2_delta'), focusScore(tToday) - yF);
+    $('#o2_yFocus').textContent = fB + '%';
+    deltaBadge($('#o2_delta'), focusScore(tA) - fB);
 
     if (o2Trend) o2Trend.destroy();
     o2Trend = new Chart(document.getElementById('o2_weekTrend').getContext('2d'), {
       type:'line',
-      data:{ labels: focus7.map((_,i)=>i+1), datasets:[{ data: focus7, tension:.3, pointRadius:0, borderWidth:2 }] },
+      data:{ labels: focusN.map((_,i)=>i+1), datasets:[{ data: focusN, tension:.3, pointRadius:0, borderWidth:2 }] },
       options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{ y:{ beginAtZero:true, max:100 } } }
     });
 
-    // --- OPTION 3: trend 28gg + delta 7/30/365 ---
-    const start28 = addDaysYMD(today, -27);
-    const { focus:focus28 } = await rangeFocusSeries(uid, start28, today);
+    // O3: trend stesso (linea)
     if (o3Trend) o3Trend.destroy();
     o3Trend = new Chart(document.getElementById('o3_trend').getContext('2d'), {
       type:'line',
-      data:{ labels: focus28.map((_,i)=>i+1), datasets:[{ data: focus28, tension:.3, pointRadius:0, borderWidth:2 }] },
+      data:{ labels: focusN.map((_,i)=>i+1), datasets:[{ data: focusN, tension:.3, pointRadius:0, borderWidth:2 }] },
       options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{ y:{ beginAtZero:true, max:100 } } }
     });
 
-    // Δ 7 / 30 / 365 (focus inizio vs fine finestra)
-    const d7start  = addDaysYMD(today, -6);
-    const d30start = addDaysYMD(today, -29);
-    const d365start= addDaysYMD(today, -364);
-    const [ser7, ser30, ser365] = await Promise.all([
-      rangeFocusSeries(uid, d7start, today),
-      rangeFocusSeries(uid, d30start, today),
-      rangeFocusSeries(uid, d365start, today)
-    ]);
-    const delta7   = (ser7.focus.at(-1)  ?? 0) - (ser7.focus[0]  ?? 0);
-    const delta30  = (ser30.focus.at(-1) ?? 0) - (ser30.focus[0] ?? 0);
-    const delta365 = (ser365.focus.at(-1)?? 0) - (ser365.focus[0]?? 0);
-    deltaBadge($('#o3_d7'),   delta7);
-    deltaBadge($('#o3_d30'),  delta30);
-    deltaBadge($('#o3_d365'), delta365);
+    // Δ 7 / 30 / 365 fino al Giorno base
+    async function deltaWindow(n){
+      const start = addDaysYMD(base, -(n-1));
+      const ser = await rangeFocusSeries(uid, start, base);
+      return (ser.focus.at(-1) ?? 0) - (ser.focus[0] ?? 0);
+    }
+    const [d7,d30,d365] = await Promise.all([deltaWindow(7), deltaWindow(30), deltaWindow(365)]);
+    deltaBadge($('#o3_d7'), d7);
+    deltaBadge($('#o3_d30'), d30);
+    deltaBadge($('#o3_d365'), d365);
 
     // Fine
-    $('#loading').style.display = 'none';
-    $('#app').style.display = '';
+    $('#loading').textContent = 'Pronto';
+    app.style.display = '';
   } catch(e){
     console.error(e);
     $('#loading').textContent = 'Errore: ' + e.message;
   }
 }
 
-/* ===================== AUTH GUARD ===================== */
+/* ===================== AUTH & UI ===================== */
+let currentUid = null;
+
 document.addEventListener('DOMContentLoaded', () => {
+  // set default dates
+  const base = todayLocalYMD();
+  $('#baseDate').value = base;
+  $('#cmpDate').value  = addDaysYMD(base, -1);
+  $('#trendLen').value = '28';
+
+  // auth guard
   auth.onAuthStateChanged(u => {
     if (!u) { window.location.href = 'index.html'; return; }
+    currentUid = u.uid;
     $('#userLabel').textContent = u.email || u.uid;
-    renderAll(u.uid);
+    renderAll(currentUid);
   });
+
+  // apply
+  $('#applyBtn').addEventListener('click', () => { if (currentUid) renderAll(currentUid); });
+  // invio rapido con Enter
+  ['baseDate','cmpDate'].forEach(id => {
+    document.getElementById(id).addEventListener('keydown', e=>{
+      if (e.key === 'Enter' && currentUid) renderAll(currentUid);
+    });
+  });
+  // cambio trend immediato
+  $('#trendLen').addEventListener('change', () => { if (currentUid) renderAll(currentUid); });
 });
 </script>
 </body>
