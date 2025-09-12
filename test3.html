@@ -3,468 +3,295 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Preview / Mock — Dashboard Attività</title>
-<link rel="icon" href="icon-192.png">
-<meta name="theme-color" content="#2196f3">
+<title>Coach del Tempo — Preview</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <style>
   :root{
-    --bg:#ffffff; --text:#1f2328; --muted:#6b7280; --primary:#1e88e5; --card:#f8fafc; --line:#e5e7eb; --good:#10b981; --bad:#ef4444;
+    --bg:#fff; --text:#1f2328; --muted:#6b7280; --line:#e5e7eb;
+    --good:#10b981; --neutral:#f59e0b; --bad:#ef4444; --primary:#1e88e5;
+    --card:#f8fafc;
   }
   *{box-sizing:border-box}
-  body{margin:0; font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial; color:var(--text); background:var(--bg)}
-  header{padding:12px 16px; border-bottom:1px solid var(--line); display:flex; gap:10px; align-items:center; flex-wrap:wrap}
-  header h1{font-size:18px; margin:0; font-weight:700}
-  .chips{display:flex; gap:6px; flex-wrap:wrap}
-  .chip{padding:6px 10px; border:1px solid var(--line); border-radius:999px; font-size:13px; background:#fff; cursor:pointer}
-  .chip.active{background:#e8f3ff; border-color:#cfe6ff; color:#1356a4}
-  .wrap{padding:12px 16px}
-  .grid{display:grid; gap:12px}
-  .grid.cards{grid-template-columns:repeat(auto-fit,minmax(180px,1fr))}
-  .card{background:var(--card); border:1px solid var(--line); border-radius:12px; padding:12px}
-  .mini{font-size:12px; color:var(--muted)}
-  .lead{font-size:22px; font-weight:800}
-  .delta{font-size:12px; font-weight:700}
+  body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;background:var(--bg);color:var(--text)}
+  header{padding:12px 16px;border-bottom:1px solid var(--line);display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+  header h1{font-size:18px;margin:0;font-weight:800}
+  .wrap{padding:14px 16px}
+  .grid{display:grid;gap:12px}
+  .cards{grid-template-columns:repeat(auto-fit,minmax(220px,1fr))}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px}
+  .mini{font-size:12px;color:var(--muted)}
+  .lead{font-size:22px;font-weight:800}
+  .delta{font-size:12px;font-weight:700}
   .delta.up{color:var(--good)} .delta.down{color:var(--bad)}
-  .row{display:flex; gap:12px; flex-wrap:wrap; align-items:flex-start}
-  .col{flex:1 1 340px; max-width:480px}
-  .chartBox{width:100%; max-width:360px; margin:auto; position:relative}
-  .chartBox canvas{width:100% !important; height:220px !important; display:block}
+  .kpiRow{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  .pill{padding:2px 8px;border-radius:999px;background:#eef2ff;font-size:12px}
+  .feedback{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
+  .fb{font-size:12px;padding:4px 8px;border-radius:999px;border:1px solid var(--line);background:#fff}
+  .fb.good{border-color:#c7f8e9;background:#eafff7} .fb.warn{border-color:#ffe4b3;background:#fff7e6} .fb.bad{border-color:#ffc7c7;background:#fff0f0}
+  .row{display:flex;gap:12px;flex-wrap:wrap;align-items:flex-start}
+  .col{flex:1 1 340px;max-width:520px}
+  .chartBox{width:100%;max-width:380px;margin:auto;position:relative}
+  .chartBox canvas{width:100% !important;height:220px !important;display:block}
   .chartBox.small canvas{height:160px !important}
-  .legend{display:flex; flex-wrap:wrap; gap:8px; margin-top:8px}
-  .dot{width:10px; height:10px; border-radius:999px; display:inline-block; margin-right:6px}
-  /* Timeline 24h */
-  .timeline{width:100%; max-width:720px; border-radius:10px; overflow:hidden; border:1px solid var(--line); margin:auto}
-  .timelineBar{height:28px; display:flex}
-  .timelineLabel{display:flex; justify-content:space-between; font-size:12px; color:#666; margin-top:6px}
-  /* Tabella + controlli */
-  .toolbar{display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:8px}
-  .btn{padding:8px 12px; border-radius:8px; border:1px solid var(--line); background:#fff; cursor:pointer; font-size:14px}
-  .btn.primary{background:#1e88e5; color:#fff; border-color:#1e88e5}
-  .btn.ghost{background:#f1f5f9}
-  input[type="search"]{padding:8px 12px; border:1px solid var(--line); border-radius:8px; min-width:220px}
-  table{width:100%; border-collapse:collapse; font-size:14px}
-  th,td{border-bottom:1px solid var(--line); padding:8px}
-  th{background:#f8fafc; text-align:left; font-weight:700}
-  td.actions{white-space:nowrap; text-align:right}
-  .tag{padding:2px 8px; border-radius:999px; background:#eef2ff; font-weight:600}
-  .pill{padding:2px 8px; border-radius:999px; background:#f1f5f9; font-size:12px}
-  .muted{color:var(--muted)}
-  .sectionTitle{margin:18px 0 8px; font-size:16px; font-weight:800}
-  .hr{height:1px; background:var(--line); margin:16px 0}
-  /* Palette anteprima */
-  .palette{display:flex; flex-wrap:wrap; gap:6px}
-  .swatch{display:flex; align-items:center; gap:6px; border:1px solid var(--line); border-radius:8px; padding:4px 8px; font-size:12px}
-  .swatch .dot{width:12px; height:12px}
+  .toolbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:8px 0}
+  input[type="range"]{width:190px}
+  .legend{display:flex;gap:10px;flex-wrap:wrap;margin-top:6px}
+  .dot{width:10px;height:10px;border-radius:999px;display:inline-block;margin-right:6px}
+  .hr{height:1px;background:var(--line);margin:16px 0}
 </style>
 </head>
 <body>
 <header>
-  <h1>Preview / Mock — Dashboard Attività</h1>
-  <div class="chips" id="presetChips">
-    <button class="chip active" data-preset="oggi">Oggi</button>
-    <button class="chip" data-preset="ieri">Ieri</button>
-    <button class="chip" data-preset="ultimi7">Ultimi 7</button>
-    <button class="chip" data-preset="ultimi30">Ultimi 30</button>
+  <h1>Coach del Tempo — Preview</h1>
+  <div class="toolbar">
+    <label class="mini">Soglia “spreco” (Entertainment tollerato): <span id="tolLabel" class="pill">20%</span></label>
+    <input id="tol" type="range" min="0" max="40" value="20" step="5" />
+    <select id="trendRange">
+      <option value="7">Ultimi 7 giorni</option>
+      <option value="28">Ultime 4 settimane</option>
+      <option value="365">Ultimi 12 mesi</option>
+    </select>
   </div>
-  <div class="chips" id="filterChips" style="margin-left:auto"></div>
 </header>
 
 <div class="wrap">
-  <!-- 1) Cards riepilogo -->
+  <!-- KPI -->
   <div class="grid cards">
     <div class="card">
-      <div class="mini">Tempo gestibile</div>
-      <div class="lead" id="cardFree">—</div>
-      <div class="mini">Obiettivo 4h/g • <span class="delta" id="deltaFree">—</span></div>
+      <div class="mini">Tempo disponibile oggi</div>
+      <div class="lead" id="kpiAvailToday">—</div>
+      <div class="mini">Non gestibile: Sleep/Work/Survive/Slavery</div>
     </div>
     <div class="card">
-      <div class="mini">Tempo non gestibile</div>
-      <div class="lead" id="cardLocked">—</div>
-      <div class="mini">Sleep/Work/Survive/Slavery</div>
+      <div class="mini">Usato bene oggi</div>
+      <div class="lead" id="kpiGoodToday">—</div>
+      <div class="mini">Focus score: <b id="kpiFocusToday">—</b></div>
     </div>
     <div class="card">
-      <div class="mini">Top tag</div>
-      <div class="lead" id="cardTop">—</div>
-      <div class="mini" id="cardTop2">—</div>
+      <div class="mini">Ieri — uso del tempo disponibile</div>
+      <div class="kpiRow">
+        <span class="pill" id="yGood">— bene</span>
+        <span class="pill" id="yNeutral">— neutro</span>
+        <span class="pill" id="yWaste">— spreco</span>
+      </div>
+      <div class="feedback" id="yFeedback"></div>
     </div>
     <div class="card">
-      <div class="mini">Attività / giorno</div>
-      <div class="lead" id="cardCount">—</div>
-      <div class="mini">Streak: <span class="pill" id="streak">—</span></div>
+      <div class="mini">Streak obiettivo (≥ 60% bene)</div>
+      <div class="lead" id="kpiStreak">—</div>
+      <div class="mini">Trend “bene/disp.” ultimi 7 giorni: <span id="kpiTrendDelta" class="delta">—</span></div>
     </div>
   </div>
 
-  <!-- 2) Timeline 24h + 3) Istogramma ore -->
-  <div class="row">
+  <!-- Donut oggi/ieri -->
+  <div class="row" style="margin-top:6px">
     <div class="col">
-      <div class="sectionTitle">Timeline 24h</div>
       <div class="card">
-        <div class="timeline">
-          <div class="timelineBar" id="timelineBar"></div>
+        <div class="mini">Oggi — come stai usando il tempo disponibile</div>
+        <div class="chartBox"><canvas id="donutToday"></canvas></div>
+        <div class="legend">
+          <span><span class="dot" style="background:var(--good)"></span>Bene</span>
+          <span><span class="dot" style="background:var(--neutral)"></span>Neutro</span>
+          <span><span class="dot" style="background:var(--bad)"></span>Spreco</span>
         </div>
-        <div class="timelineLabel"><span>00:00</span><span>24:00</span></div>
-        <div class="legend" id="legendTimeline"></div>
       </div>
     </div>
     <div class="col">
-      <div class="sectionTitle">Distribuzione per ora</div>
       <div class="card">
-        <div class="chartBox small"><canvas id="hourChart"></canvas></div>
+        <div class="mini">Ieri — uso del tempo disponibile</div>
+        <div class="chartBox"><canvas id="donutYesterday"></canvas></div>
       </div>
     </div>
   </div>
 
-  <!-- 4) Small multiples -->
+  <!-- Trend -->
   <div class="row">
     <div class="col">
-      <div class="sectionTitle">Oggi</div>
-      <div class="card"><div class="chartBox"><canvas id="pieToday"></canvas></div></div>
+      <div class="card">
+        <div class="mini">Trend Focus score (bene / disponibile)</div>
+        <div class="chartBox small"><canvas id="trendFocus"></canvas></div>
+      </div>
     </div>
     <div class="col">
-      <div class="sectionTitle">Ieri</div>
-      <div class="card"><div class="chartBox"><canvas id="pieYesterday"></canvas></div></div>
-    </div>
-    <div class="col">
-      <div class="sectionTitle">Media ultimi 7 gg</div>
-      <div class="card"><div class="chartBox"><canvas id="pieLast7"></canvas></div></div>
-    </div>
-  </div>
-
-  <!-- 8) Trend & streak -->
-  <div class="row">
-    <div class="col">
-      <div class="sectionTitle">Trend 14 giorni (tempo gestibile)</div>
-      <div class="card"><div class="chartBox small"><canvas id="trendSpark"></canvas></div></div>
-    </div>
-    <div class="col">
-      <div class="sectionTitle">Palette tag (coerenza cromatica)</div>
-      <div class="card"><div class="palette" id="palette"></div></div>
+      <div class="card">
+        <div class="mini">Stack giornaliero — bene / neutro / spreco (ultimi giorni)</div>
+        <div class="chartBox small"><canvas id="stackDays"></canvas></div>
+      </div>
     </div>
   </div>
 
   <div class="hr"></div>
-
-  <!-- 5) Filtri rapidi + 6) Tabella -->
-  <div class="sectionTitle">Attività (mock)</div>
-  <div class="toolbar">
-    <input type="search" id="search" placeholder="Cerca in attività o tag…" />
-    <button class="btn primary" onclick="mockExportCSV()">Esporta CSV</button>
-    <button class="btn ghost" onclick="alert('PNG dei grafici: usa toBase64Image() in produzione')">Esporta PNG (mock)</button>
-    <span class="muted">Mostrati: <span id="shownCount">—</span></span>
-  </div>
-  <div class="card" style="overflow:auto">
-    <table id="tbl">
-      <thead><tr><th>Data</th><th>Ora</th><th>Tag</th><th>Attività</th><th>Durata stim.</th><th class="actions">Azioni</th></tr></thead>
-      <tbody id="tbody"></tbody>
-    </table>
+  <div class="mini">
+    <b>Definizioni (mock):</b> non gestibile = Sleep/Work/Survive/Slavery.  
+    Bene = Study/Productivity/Book/Chinese/Gym/Bike/Chess.  
+    Neutro = Entertainment/Holiday/Nut.  
+    Spreco = Waste + eventuale <i>Entertainment</i> che supera la soglia.  
+    Focus score = minuti “bene” / tempo disponibile.
   </div>
 </div>
 
 <script>
-/* ======= MOCK DATA & PALETTE ======= */
-const TAG_COLORS={
-  Work:'#4f6cff', Study:'#00b894', Survive:'#a29bfe', Sleep:'#636e72', Slavery:'#d63031',
-  Productivity:'#0984e3', Waste:'#b2bec3', Gym:'#e17055', Bike:'#fdcb6e',
-  Entertainment:'#00cec9', Holiday:'#ff7675', Chinese:'#6c5ce7', Chess:'#81ecec',
-  Book:'#fab1a0', Nut:'#e84393'
+/* ====== TAG BUCKETS & MOCK DATA ====== */
+const NON_LIBERI = ['Sleep','Work','Survive','Slavery'];
+const GOOD = ['Study','Productivity','Book','Chinese','Gym','Bike','Chess'];
+const NEUTRAL = ['Entertainment','Holiday','Nut'];
+const WASTE = ['Waste'];
+
+const DAY_MOCK = {
+  // Ogni elemento: [tag, minuti]
+  today: [
+    ['Sleep',450], ['Survive',40], ['Work',460], ['Study',120], ['Productivity',60],
+    ['Entertainment',70], ['Gym',60], ['Waste',20], ['Book',30], ['Chinese',30], ['Bike',20]
+  ],
+  yesterday: [
+    ['Sleep',460], ['Survive',30], ['Work',480], ['Study',60], ['Productivity',45],
+    ['Entertainment',120], ['Waste',40], ['Book',20], ['Gym',30]
+  ]
 };
-const NON_LIBERI=['Survive','Sleep','Work','Slavery'];
-const DATASETS={
-  oggi:{
-    segments:[ // start-end per timeline (HH:MM)
-      ['Sleep','00:00','07:30'],
-      ['Survive','07:30','08:00'],
-      ['Bike','08:00','08:30'],
-      ['Work','08:30','12:30'],
-      ['Survive','12:30','13:00'],
-      ['Study','13:00','15:00'],
-      ['Waste','15:00','15:30'],
-      ['Work','15:30','18:00'],
-      ['Gym','18:00','19:00'],
-      ['Entertainment','19:00','20:00'],
-      ['Book','20:00','20:30'],
-      ['Chinese','20:30','21:30'],
-      ['Bike','21:30','22:00'],
-      ['Sleep','22:00','24:00'],
-    ],
-    hour:[0,0,0,0,0,0,30,60,30,240,60,30,60,120,30,150,0,60,60,60,30,60,30,120],
-    last14:[180,210,200,240,260,220,240,180,210,260,200,220,240,250], // min "free"
-    table:[
-      ['2025-09-10','08:45','Work','Emails e pianificazione',45],
-      ['2025-09-10','09:30','Work','Sprint review',180],
-      ['2025-09-10','13:10','Study','Khan Academy - Algebra',60],
-      ['2025-09-10','18:05','Gym','Panca / trazioni',60],
-      ['2025-09-10','20:40','Chinese','HSK vocabolario',40],
-    ]
-  },
-  ieri:{
-    segments:[
-      ['Sleep','00:00','07:45'],['Survive','07:45','08:10'],['Work','08:10','12:00'],
-      ['Survive','12:00','12:30'],['Work','12:30','17:30'],['Bike','17:30','18:00'],
-      ['Entertainment','18:00','19:00'],['Study','19:00','20:00'],['Book','20:00','21:00'],['Sleep','21:00','24:00'],
-    ],
-    hour:[0,0,0,0,0,0,15,40,30,220,30,30,30,300,0,60,0,30,60,60,60,60,60,180],
-    last14:[160,180,220,200,240,210,200,170,190,200,210,200,210,230],
-    table:[
-      ['2025-09-09','09:10','Work','Ticket #2345',160],
-      ['2025-09-09','13:00','Survive','Pranzo',30],
-      ['2025-09-09','19:10','Study','React hooks',50],
-      ['2025-09-09','20:30','Book','Atomic Habits',30],
-    ]
-  },
-  ultimi7:{ // usiamo medie sintetiche
-    segments:[
-      ['Sleep','00:00','07:15'],['Survive','07:15','08:10'],['Work','08:10','12:10'],
-      ['Survive','12:10','12:40'],['Work','12:40','16:40'],['Study','17:00','18:00'],
-      ['Entertainment','18:00','19:00'],['Book','21:30','22:00'],['Sleep','22:00','24:00'],
-    ],
-    hour:new Array(24).fill(0).map((_,i)=> (i>=8&&i<=12)?180/(12-8+1) : (i>=13&&i<=17)?200/(17-13+1) : (i==21?40:(i==18?60:20))),
-    last14:[180,180,210,210,230,230,210,190,200,200,210,220,230,240],
-    table:[
-      ['2025-09-08','08:20','Work','Standup',20],
-      ['2025-09-07','17:10','Study','Leetcode',50],
-      ['2025-09-06','18:40','Entertainment','Serie TV',60],
-      ['2025-09-05','21:10','Book','Sapiens',35],
-    ]
-  },
-  ultimi30:{
-    segments:[
-      ['Sleep','00:00','07:30'],['Survive','07:30','08:00'],['Work','08:00','12:00'],
-      ['Survive','12:00','12:30'],['Work','12:30','17:00'],['Gym','18:00','19:00'],
-      ['Chinese','20:00','21:00'],['Sleep','22:00','24:00'],
-    ],
-    hour:new Array(24).fill(0).map((_,i)=> (i>=8&&i<=12)?200/(12-8+1) : (i>=13&&i<=17)?240/(17-13+1) : (i==20?60:(i==18?60:15))),
-    last14:[160,170,160,180,190,210,180,170,175,185,195,205,210,190],
-    table:[
-      ['2025-09-01','20:05','Chinese','HSK2 writing',55],
-      ['2025-08-29','18:00','Gym','Circuito',60],
-      ['2025-08-27','13:00','Survive','Pranzo',30],
-    ]
+
+// Trend (finto): array di giorni con triplette [bene, neutro, spreco] (minuti) e “disponibile”
+const TREND_MOCK = Array.from({length: 30}, (_,i)=> {
+  const baseAvail = 24*60 - (450 + 40 + 460 + (i%3?0:20)); // piccole variazioni
+  const good = Math.max(0, Math.round(0.55*baseAvail + ((i%5)-2)*10));
+  const neutral = Math.max(0, Math.round(0.25*baseAvail + ((i%7)-3)*6));
+  const waste = Math.max(0, baseAvail - good - neutral);
+  return {good, neutral, waste, avail: baseAvail};
+});
+
+/* ====== UTILS ====== */
+const $ = s => document.querySelector(s);
+const fmtHM = m => `${Math.floor(m/60)}h ${String(m%60).padStart(2,'0')}m`;
+const sum = arr => arr.reduce((a,b)=>a+b,0);
+
+function splitBuckets(dayArray, tolerancePct) {
+  const totals = {nonGest:0, good:0, neutral:0, waste:0, avail:0};
+
+  let entertainment = 0;
+  for (const [tag, min] of dayArray) {
+    if (NON_LIBERI.includes(tag)) totals.nonGest += min;
+    else if (GOOD.includes(tag)) totals.good += min;
+    else if (NEUTRAL.includes(tag)) {
+      if (tag === 'Entertainment') entertainment += min;
+      else totals.neutral += min;
+    } else if (WASTE.includes(tag)) totals.waste += min;
+    else totals.neutral += min; // fallback
   }
-};
-/* ======= UTILS ======= */
-const $=s=>document.querySelector(s);
-const hmsToMin = t => { const [h,m]=t.split(':').map(Number); return h*60+m; };
-const fmtHM = min => {
-  const h=Math.floor(min/60), m=min%60;
-  return `${h}h ${String(m).padStart(2,'0')}m`;
-};
-function sum(arr){return arr.reduce((a,b)=>a+b,0)}
-function groupByTag(segments){
-  const out={}; segments.forEach(([tag,a,b])=>{
-    const mins=hmsToMin(b)-hmsToMin(a); out[tag]=(out[tag]||0)+mins;
-  }); return out;
+  totals.avail = Math.max(0, 24*60 - totals.nonGest);
+
+  // Entertainment: neutro fino alla soglia, eccesso → waste
+  const allowed = Math.round(totals.avail * tolerancePct / 100);
+  const entNeutral = Math.min(entertainment, allowed);
+  const entOverflow = Math.max(0, entertainment - allowed);
+  totals.neutral += entNeutral;
+  totals.waste += entOverflow;
+
+  return totals;
 }
-function topTags(map, n=2){
-  return Object.entries(map).sort((a,b)=>b[1]-a[1]).slice(0,n);
-}
-/* ======= RENDER ======= */
-let current='oggi';
-let hourChart,pieToday,pieYesterday,pieLast7,trendSpark;
+
+/* ====== CHARTS ====== */
+let donutToday, donutYesterday, trendFocus, stackDays;
 
 function renderAll(){
-  const ds=DATASETS[current];
+  const tol = Number($('#tol').value);
+  $('#tolLabel').textContent = tol + '%';
 
-  // 1) Cards
-  const perTag = groupByTag(ds.segments);
-  const total = 1440;
-  let nonGestibile=0, gestibile=0;
-  Object.entries(perTag).forEach(([tag,min])=>{
-    if (NON_LIBERI.includes(tag)) nonGestibile+=min; else gestibile+=min;
-  });
-  $('#cardFree').textContent = fmtHM(gestibile);
-  $('#cardLocked').textContent = fmtHM(nonGestibile);
-  const [t1,t2]=topTags(perTag,2);
-  $('#cardTop').innerHTML = t1? `<span class="dot" style="background:${TAG_COLORS[t1[0]]}"></span>${t1[0]} · ${Math.round(t1[1]/total*100)}%` : '—';
-  $('#cardTop2').innerHTML = t2? `<span class="dot" style="background:${TAG_COLORS[t2[0]]}"></span>${t2[0]} · ${Math.round(t2[1]/total*100)}%` : '—';
-  // mock delta vs ieri
-  const dsY=DATASETS.ieri;
-  const perTagY = groupByTag(dsY.segments);
-  let gestY=0; Object.entries(perTagY).forEach(([tag,min])=>{ if(!NON_LIBERI.includes(tag)) gestY+=min; });
-  const diff=gestibile-gestY;
-  const perc = gestY>0 ? Math.round(diff/gestY*100) : 0;
-  $('#deltaFree').textContent=(diff>=0?`▲ +${perc}%`:`▼ ${perc}%`);
-  $('#deltaFree').className='delta ' + (diff>=0?'up':'down');
-  $('#cardCount').textContent = String(DATASETS[current].table.length);
-  $('#streak').textContent = (gestibile>=240? '3 giorni' : '0 giorni'); // mock
+  // Oggi
+  const T = splitBuckets(DAY_MOCK.today, tol);
+  $('#kpiAvailToday').textContent = fmtHM(T.avail);
+  $('#kpiGoodToday').textContent = fmtHM(T.good);
+  const focusToday = T.avail ? Math.round((T.good/T.avail)*100) : 0;
+  $('#kpiFocusToday').textContent = focusToday + '%';
 
-  // 2) Timeline
-  renderTimeline(ds.segments);
+  donutToday = makeDonut(donutToday, 'donutToday', T);
 
-  // 3) Istogramma ore
-  renderHourChart(ds.hour);
+  // Ieri
+  const Y = splitBuckets(DAY_MOCK.yesterday, tol);
+  $('#yGood').textContent   = fmtHM(Y.good)   + ' bene';
+  $('#yNeutral').textContent= fmtHM(Y.neutral)+ ' neutro';
+  $('#yWaste').textContent  = fmtHM(Y.waste)  + ' spreco';
+  donutYesterday = makeDonut(donutYesterday, 'donutYesterday', Y);
 
-  // 4) Small multiples (pietorte)
-  renderPies();
+  // Feedback ieri
+  const fb = [];
+  const yFocus = Y.avail ? (Y.good/Y.avail) : 0;
+  if (yFocus >= 0.6) fb.push(`<span class="fb good">👍 Ottimo focus (${Math.round(yFocus*100)}%)</span>`);
+  else if (yFocus >= 0.45) fb.push(`<span class="fb warn">⚠️ Focus discreto (${Math.round(yFocus*100)}%)</span>`);
+  else fb.push(`<span class="fb bad">🔻 Basso focus (${Math.round(yFocus*100)}%)</span>`);
+  if (Y.waste > Y.neutral) fb.push(`<span class="fb bad">🧯 Spreco alto: ${fmtHM(Y.waste)}</span>`);
+  if (Y.neutral > Y.good) fb.push(`<span class="fb warn">🎭 Troppo neutro rispetto al bene</span>`);
+  $('#yFeedback').innerHTML = fb.join(' ');
 
-  // 8) Trend sparkline
-  renderTrend(DATASETS[current].last14);
+  // Trend range
+  const range = Number($('#trendRange').value);
+  const slice = TREND_MOCK.slice(-range);
+  const focusSeries = slice.map(d => d.avail ? Math.round(100*d.good/d.avail) : 0);
+  const delta = focusSeries.at(-1) - focusSeries[0];
+  $('#kpiTrendDelta').textContent = (delta>=0?`▲ +${delta}%`:`▼ ${delta}%`);
+  $('#kpiTrendDelta').className = 'delta ' + (delta>=0?'up':'down');
 
-  // 7) Palette
-  renderPalette();
+  // Streak (≥ 60% bene)
+  $('#kpiStreak').textContent = calcStreak(focusSeries, 60) + ' giorni';
 
-  // 6) Tabella + ricerca
-  fillTable(DATASETS[current].table);
-  applySearch(); // se c'è del testo in ricerca
+  trendFocus = makeLine(trendFocus, 'trendFocus', focusSeries);
+  stackDays  = makeStack(stackDays, 'stackDays', slice);
 }
-function renderTimeline(segments){
-  const bar = $('#timelineBar'); bar.innerHTML='';
-  segments.forEach(([tag,a,b])=>{
-    const start=hmsToMin(a), end=hmsToMin(b), w=(end-start)/1440*100;
-    const el=document.createElement('div');
-    el.style.width=`${w}%`;
-    el.style.background=TAG_COLORS[tag]||'#ddd';
-    el.title=`${a}-${b} ${tag}`;
-    bar.appendChild(el);
-  });
-  // legenda (solo tag presenti)
-  const leg=$('#legendTimeline'); leg.innerHTML='';
-  Array.from(new Set(segments.map(s=>s[0]))).forEach(tag=>{
-    const span=document.createElement('span');
-    span.innerHTML = `<span class="dot" style="background:${TAG_COLORS[tag]}"></span>${tag}`;
-    leg.appendChild(span);
-  });
+
+function calcStreak(arr, threshold){
+  let s=0; for (let i=arr.length-1;i>=0;i--){ if (arr[i] >= threshold) s++; else break; } return s;
 }
-function renderHourChart(hours){
-  const ctx=$('#hourChart').getContext('2d');
-  if (hourChart) hourChart.destroy();
-  hourChart = new Chart(ctx,{
-    type:'bar',
-    data:{ labels:[...Array(24).keys()].map(h=>String(h).padStart(2,'0')),
-      datasets:[{label:'minuti', data:hours}]},
-    options:{
-      responsive:true, maintainAspectRatio:false,
-      plugins:{legend:{display:false}},
-      scales:{y:{beginAtZero:true}}
-    }
-  });
-}
-function renderPies(){
-  // Today
-  const perTagOggi=groupByTag(DATASETS.oggi.segments);
-  pieToday = makePie(pieToday,'pieToday',perTagOggi);
-  // Yesterday
-  const perTagIeri=groupByTag(DATASETS.ieri.segments);
-  pieYesterday = makePie(pieYesterday,'pieYesterday',perTagIeri);
-  // Last7 (media fake: usiamo perTag dell preset ultimi7)
-  const perTag7=groupByTag(DATASETS.ultimi7.segments);
-  pieLast7 = makePie(pieLast7,'pieLast7',perTag7);
-}
-function makePie(instance, id, perTag){
+
+function makeDonut(instance, id, totals){
   const ctx = document.getElementById(id).getContext('2d');
   if (instance) instance.destroy();
-  const labels=Object.keys(perTag);
-  const data=Object.values(perTag);
-  const colors=labels.map(l=>TAG_COLORS[l]||'#ccc');
+  const data = [totals.good, totals.neutral, totals.waste];
+  return new Chart(ctx, {
+    type: 'doughnut',
+    data: { labels:['Bene','Neutro','Spreco'], datasets:[{ data, backgroundColor:['#10b981','#f59e0b','#ef4444'] }] },
+    options: {
+      responsive: true, maintainAspectRatio: false, cutout: '60%',
+      plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 11 } } } }
+    }
+  });
+}
+function makeLine(instance, id, values){
+  const ctx = document.getElementById(id).getContext('2d');
+  if (instance) instance.destroy();
   return new Chart(ctx,{
-    type:'pie',
-    data:{labels, datasets:[{data, backgroundColor:colors}]},
-    options:{
-      responsive:true, maintainAspectRatio:false,
-      plugins:{legend:{position:'bottom', labels:{boxWidth:10, font:{size:11}}}}
-    }
-  });
-}
-function renderTrend(list){
-  const ctx=$('#trendSpark').getContext('2d');
-  if (trendSpark) trendSpark.destroy();
-  trendSpark = new Chart(ctx,{
     type:'line',
-    data:{labels: list.map((_,i)=>i+1), datasets:[{label:'min gestibili', data:list, tension:.3, pointRadius:0}]},
+    data:{ labels: values.map((_,i)=>i+1), datasets:[{ data: values, tension:.3, pointRadius:0, borderWidth:2 }]},
+    options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{ y:{ beginAtZero:true, max:100 } } }
+  });
+}
+function makeStack(instance, id, days){
+  const labels = days.map((_,i)=>i+1);
+  const good = days.map(d=>d.good);
+  const neutral = days.map(d=>d.neutral);
+  const waste = days.map(d=>d.waste);
+  const ctx = document.getElementById(id).getContext('2d');
+  if (instance) instance.destroy();
+  return new Chart(ctx,{
+    type:'bar',
+    data:{
+      labels,
+      datasets:[
+        {label:'Bene', data:good,   stack:'t', backgroundColor:'#10b981'},
+        {label:'Neutro', data:neutral, stack:'t', backgroundColor:'#f59e0b'},
+        {label:'Spreco', data:waste, stack:'t', backgroundColor:'#ef4444'}
+      ]
+    },
     options:{
       responsive:true, maintainAspectRatio:false,
-      plugins:{legend:{display:false}},
-      scales:{y:{beginAtZero:true}}
+      plugins:{ legend:{ position:'bottom', labels:{ boxWidth:10, font:{ size:11 } } } },
+      scales:{ x:{ stacked:true }, y:{ stacked:true, beginAtZero:true } }
     }
   });
 }
-function renderPalette(){
-  const pal=$('#palette'); pal.innerHTML='';
-  Object.entries(TAG_COLORS).forEach(([tag,color])=>{
-    const d=document.createElement('div'); d.className='swatch';
-    d.innerHTML=`<span class="dot" style="background:${color}"></span>${tag}`;
-    pal.appendChild(d);
-  });
-}
-/* ======= TABELLA ======= */
-let tableData=[];
-function fillTable(rows){
-  tableData = rows.map(r=>({...r}));
-  const tbody=$('#tbody'); tbody.innerHTML='';
-  rows.forEach(([date,time,tag,act,dur])=>{
-    const tr=document.createElement('tr');
-    tr.innerHTML = `
-      <td>${date}</td>
-      <td>${time}</td>
-      <td><span class="tag" style="background:${(TAG_COLORS[tag]||'#eef2ff')}22; color:#333">${tag}</span></td>
-      <td>${act}</td>
-      <td>${dur? dur+' min' : '—'}</td>
-      <td class="actions">
-        <button class="btn" onclick="alert('✏️ Modifica (mock)')">✏️</button>
-        <button class="btn" onclick="alert('🗑️ Elimina (mock)')">🗑️</button>
-      </td>`;
-    tbody.appendChild(tr);
-  });
-  $('#shownCount').textContent=rows.length;
-}
-function applySearch(){
-  const q = $('#search').value.toLowerCase().trim();
-  const tbody=$('#tbody');
-  Array.from(tbody.rows).forEach(r=>{
-    const text = r.innerText.toLowerCase();
-    r.style.display = text.includes(q)? '' : 'none';
-  });
-  const shown = Array.from(tbody.rows).filter(r=>r.style.display!=='none').length;
-  $('#shownCount').textContent = shown;
-}
-$('#search').addEventListener('input', applySearch);
-/* ======= FILTRI TAG VISIVI (mock) ======= */
-const filterState=new Set(); // se non vuoto, mostra solo questi tag nelle pietorte/timeline
-function buildFilterChips(){
-  const cont=$('#filterChips'); cont.innerHTML='';
-  Object.keys(TAG_COLORS).forEach(tag=>{
-    const b=document.createElement('button');
-    b.className='chip'; b.textContent=tag;
-    b.onclick=()=>{
-      if (filterState.has(tag)) filterState.delete(tag); else filterState.add(tag);
-      b.classList.toggle('active');
-      applyTagFilter();
-    };
-    cont.appendChild(b);
-  });
-}
-function applyTagFilter(){
-  // Timeline: ricostruisci con soli tag filtrati (o tutti se filtro vuoto)
-  const base=DATASETS[current].segments;
-  const filtered = filterState.size? base.filter(([tag])=>filterState.has(tag)) : base;
-  renderTimeline(filtered.length? filtered : base);
 
-  // Pie corrente (oggi nel mock): rifai con filtro
-  const perTag = groupByTag(filtered.length? filtered : base);
-  pieToday = makePie(pieToday,'pieToday', perTag);
-}
-/* ======= PRESET CHIPS ======= */
-document.querySelectorAll('#presetChips .chip').forEach(ch=>{
-  ch.addEventListener('click', ()=>{
-    document.querySelectorAll('#presetChips .chip').forEach(c=>c.classList.remove('active'));
-    ch.classList.add('active');
-    current=ch.dataset.preset;
-    filterState.clear(); buildFilterChips(); // reset filtri al cambio preset
-    renderAll();
-  });
-});
-/* ======= EXPORT (mock) ======= */
-function mockExportCSV(){
-  const rows=[['Data','Ora','Tag','Attività','Durata']];
-  DATASETS[current].table.forEach(r=>rows.push(r));
-  const csv=rows.map(r=>r.map(x=>`"${String(x).replace(/"/g,'""')}"`).join(',')).join('\n');
-  const blob=new Blob([csv],{type:'text/csv;charset=utf-8;'});
-  const a=document.createElement('a');
-  a.href=URL.createObjectURL(blob); a.download=`export-${current}.csv`; a.click();
-}
-/* ======= BOOT ======= */
-buildFilterChips();
+/* EVENTS */
+document.getElementById('tol').addEventListener('input', renderAll);
+document.getElementById('trendRange').addEventListener('change', renderAll);
+
+/* BOOT */
 renderAll();
 </script>
 </body>
