@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html lang="it" data-theme="light">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Statistiche</title>
+
+<!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<!-- Firebase (compat) -->
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+
+<style>
+  :root{
+    /* Light */
+    --bg:#ffffff; --text:#0b1320; --muted:#6b7280; --line:#e5e7eb; --card:#f8fafc;
+    --good:#06c167; --neutral:#6b7280; --bad:#ff2d55; /* più accesi */
+    --good-bg:#e9fff4; --neutral-bg:#f3f4f6; --bad-bg:#ffe9ee;
+    --link:#1e88e5;
+  }
+  [data-theme="dark"]{
+    --bg:#0b1118; --text:#e6edf3; --muted:#94a3b8; --line:#1f2937; --card:#0f1620;
+    --good:#22d47b; --neutral:#a6adbb; --bad:#ff4d6d;
+    --good-bg:#0d2a1e; --neutral-bg:#141a23; --bad-bg:#2a0f15;
+    --link:#62a8ff;
+  }
+
+  *{box-sizing:border-box}
+  body{margin:0; font-family:system-ui, -apple-system, Segoe UI, Roboto, Arial; color:var(--text); background:var(--bg)}
+  header{padding:12px 16px; border-bottom:1px solid var(--line); display:flex; align-items:center; gap:10px; flex-wrap:wrap}
+  header h1{margin:0; font-size:18px; font-weight:800}
+  .right{margin-left:auto; display:flex; gap:8px; align-items:center}
+  a.btn{background:var(--link); color:#fff; padding:8px 10px; border-radius:8px; text-decoration:none; font-size:14px}
+  .muted{color:var(--muted); font-size:12px}
+  .toggle{border:1px solid var(--line); background:transparent; color:var(--text); border-radius:8px; padding:8px 10px; cursor:pointer}
+
+  .wrap{padding:14px 16px; display:grid; gap:14px}
+  .card{background:var(--card); border:1px solid var(--line); border-radius:12px; padding:12px}
+  .title{margin:0 0 4px; font-size:16px; font-weight:800}
+
+  .toolbar{display:flex; gap:8px; align-items:center; flex-wrap:wrap}
+  .toolbar input[type="date"], .toolbar select{
+    padding:8px 10px; border:1px solid var(--line); background:transparent; color:var(--text); border-radius:8px; font-size:14px
+  }
+  .navbtn{width:36px; height:36px; border-radius:8px; border:1px solid var(--line); background:transparent; color:var(--text); cursor:pointer; font-size:16px}
+  .gear{margin-left:auto; cursor:pointer; font-size:18px; opacity:.8}
+
+  .chartBox{width:100%; max-width:360px; margin:auto}
+  .chartBox canvas{width:100% !important; height:220px !important; display:block}
+  .chartBox.small canvas{height:160px !important}
+
+  .chips{display:flex; gap:8px; flex-wrap:wrap; margin-top:8px}
+  .chip{padding:6px 10px; border:1px solid var(--line); border-radius:10px; background:transparent; color:var(--text); font-size:13px; white-space:nowrap}
+
+  .bar{height:10px; width:100%; background:#eef2f7; border-radius:999px; overflow:hidden; margin-top:10px}
+  [data-theme="dark"] .bar{background:#1f2732}
+  .bar > span{display:block; height:100%}
+  .bar .good{background:var(--good)}
+  .bar .neutral{background:var(--neutral)}
+  .bar .bad{background:var(--bad)}
+
+  table{width:100%; border-collapse:collapse; margin-top:8px}
+  th, td{border:1px solid var(--line); padding:6px 8px; font-size:14px}
+  th{background:transparent; text-align:left}
+  tr.good{background:var(--good-bg)}
+  tr.neutral{background:var(--neutral-bg)}
+  tr.bad{background:var(--bad-bg)}
+
+  .toggles{display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-top:6px}
+  label.chk{display:inline-flex; align-items:center; gap:6px; font-size:13px; color:var(--text)}
+  label.chk input{accent-color:var(--text)}
+  .dot{display:inline-block; width:10px; height:10px; border-radius:999px}
+  .dot.good{background:var(--good)} .dot.neutral{background:var(--neutral)} .dot.bad{background:var(--bad)}
+
+  .panel{display:none; padding:10px; border:1px dashed var(--line); border-radius:10px; background:transparent; margin-top:6px}
+  .panel.show{display:block}
+  .panel .row{display:flex; gap:8px; flex-wrap:wrap}
+  .panel input, .panel select, .panel button{padding:8px 10px; border:1px solid var(--line); border-radius:8px; font-size:14px; background:transparent; color:var(--text)}
+  .panel button{background:var(--text); color:var(--bg); cursor:pointer; border-color:var(--text)}
+  .maplist{margin-top:6px; display:flex; gap:6px; flex-wrap:wrap}
+  .pill{border:1px solid var(--line); border-radius:999px; padding:4px 8px; font-size:12px}
+</style>
+</head>
+<body>
+<header>
+  <h1>Statistiche</h1>
+  <div class="right">
+    <button id="themeBtn" class="toggle" title="Tema">🌙</button>
+    <span id="userLabel" class="muted">—</span>
+    <a class="btn" href="index.html">↩︎ Inserimento</a>
+  </div>
+</header>
+
+<div class="wrap">
+  <!-- CONTROLLI GIORNO -->
+  <div class="card">
+    <div class="toolbar">
+      <button id="prevDay" class="navbtn" title="Giorno precedente">‹</button>
+      <input type="date" id="dayPick">
+      <button id="nextDay" class="navbtn" title="Giorno successivo">›</button>
+      <span id="loading" class="muted">Caricamento…</span>
+      <span id="openGear" class="gear" title="Gestione categorie">⚙︎</span>
+    </div>
+    <div id="gearPanel" class="panel" aria-hidden="true">
+      <div class="muted" style="margin-bottom:6px">Mappa un tag alla sua categoria (salvato solo su questo dispositivo).</div>
+      <div class="row">
+        <input id="tagName" placeholder="Tag (es. Nut)" />
+        <select id="tagCat">
+          <option value="good">Produttivo</option>
+          <option value="neutral">Neutro</option>
+          <option value="bad">Spreco</option>
+          <option value="non">Non gestibile</option>
+        </select>
+        <button id="saveMap">Aggiungi/aggiorna</button>
+        <button id="resetMap" style="background:#ff2d55">Reset</button>
+      </div>
+      <div class="maplist" id="mapList"></div>
+    </div>
+  </div>
+
+  <!-- GIORNO -->
+  <section class="card">
+    <h2 class="title">Giorno</h2>
+    <div class="row">
+      <div class="col">
+        <div class="chartBox"><canvas id="dailyDonut"></canvas></div>
+        <div class="chips">
+          <span class="chip">Disponibile: <b id="d_avail">—</b></span>
+          <span class="chip">Rimanente: <b id="d_remaining">—</b></span>
+          <span class="chip">Focus: <b id="d_focus">—%</b></span>
+        </div>
+        <div class="bar">
+          <span id="d_bar_good" class="good" style="width:0%"></span>
+          <span id="d_bar_neut" class="neutral" style="width:0%"></span>
+          <span id="d_bar_wast" class="bad" style="width:0%"></span>
+        </div>
+      </div>
+      <div class="col">
+        <table>
+          <thead><tr><th>Tag</th><th>Tempo</th><th>%</th></tr></thead>
+          <tbody id="dailyRank"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- PERIODO (Settimana/Mese/Anno) -->
+  <section class="card">
+    <h2 class="title">Periodo</h2>
+    <div class="toolbar">
+      <span class="muted">Tipo:</span>
+      <select id="perType">
+        <option value="week" selected>Settimana</option>
+        <option value="month">Mese</option>
+        <option value="year">Anno</option>
+      </select>
+      <span class="muted">Fine periodo:</span>
+      <input type="date" id="perEnd">
+      <button id="perApply" class="toggle">Applica</button>
+    </div>
+
+    <div class="toggles">
+      <label class="chk"><input type="checkbox" id="tgGood" checked><span class="dot good"></span>Produttivo</label>
+      <label class="chk"><input type="checkbox" id="tgNeutral"><span class="dot neutral"></span>Neutro</label>
+      <label class="chk"><input type="checkbox" id="tgBad" checked><span class="dot bad"></span>Spreco</label>
+    </div>
+
+    <div class="row" style="margin-top:6px">
+      <div class="col">
+        <div class="chartBox small"><canvas id="perTrend"></canvas></div>
+      </div>
+      <div class="col">
+        <table>
+          <thead><tr><th>Tag</th><th>Tempo</th><th>%</th></tr></thead>
+          <tbody id="perRank"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+</div>
+
+<script>
+/* ===== Firebase init ===== */
+const firebaseConfig = {
+  apiKey: "AIzaSyDEq8aUhdBPcjYM6H6909DldXAdjhRNWbI",
+  authDomain: "time-ff7ed.firebaseapp.com",
+  projectId: "time-ff7ed",
+  storageBucket: "time-ff7ed.appspot.com",
+  messagingSenderId: "842285944784",
+  appId: "1:842285944784:web:de483548153abc956033d5",
+  measurementId: "G-ZR0BNWGVXJ"
+};
+if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const db = firebase.firestore();
+
+/* ===== Theme (light/dark) ===== */
+const THEME_KEY = 'tt_theme';
+function applyTheme(t){ document.documentElement.setAttribute('data-theme', t); localStorage.setItem(THEME_KEY, t); document.getElementById('themeBtn').textContent = (t==='dark'?'☀️':'🌙'); }
+(function initTheme(){ applyTheme(localStorage.getItem(THEME_KEY)||'light'); })();
+document.getElementById('themeBtn').addEventListener('click', ()=>{
+  const cur = document.documentElement.getAttribute('data-theme');
+  applyTheme(cur==='dark'?'light':'dark');
+});
+
+/* ===== Categories (base) + custom map (localStorage) ===== */
+let NON_G = ['Sleep','Work','Survive','Slavery'];
+let GOOD  = ['Study','Productivity','Book','Chinese','Gym','Bike','Chess'];
+let NEUT  = ['Entertainment','Holiday','Nut'];
+let WAST  = ['Waste'];
+
+const LS_KEY = 'tt_custom_tag_map';
+function loadCustomMap(){ try{ return JSON.parse(localStorage.getItem(LS_KEY)||'{}'); }catch{ return {}; } }
+function saveCustomMap(m){ localStorage.setItem(LS_KEY, JSON.stringify(m)); }
+let customMap = loadCustomMap();
+
+function tagCategory(tag){
+  const t = String(tag||'').trim();
+  if (!t) return 'neutral';
+  const m = customMap[t];
+  if (m) return m;
+  if (NON_G.includes(t)) return 'non';
+  if (GOOD.includes(t)) return 'good';
+  if (NEUT.includes(t)) return 'neutral';
+  if (WAST.includes(t)) return 'bad';
+  return 'neutral';
+}
+
+/* ===== DOM & time utils ===== */
+const $ = s => document.querySelector(s);
+const fmtHM = m => { const h=Math.floor(m/60),mm=m%60; if(h>0&&mm>0)return `${h}h ${mm}m`; if(h>0)return `${h}h`; return `${mm}m`; };
+
+function todayYMD(){
+  const now=new Date(); const tz=-now.getTimezoneOffset(); const local=new Date(now.getTime()+tz*60000);
+  return local.toISOString().slice(0,10);
+}
+function addDaysYMD(ymd, d){
+  const [y,m,dy]=ymd.split('-').map(Number); const dt=new Date(Date.UTC(y,m-1,dy)); dt.setUTCDate(dt.getUTCDate()+d);
+  return `${dt.getUTCFullYear()}-${String(dt.getUTCMonth()+1).padStart(2,'0')}-${String(dt.getUTCDate()).padStart(2,'0')}`;
+}
+const dayStart = d => `${d}T00:00`;
+const dayEnd   = d => `${d}T23:59:59`;
+
+function periodStart(endYmd, type){
+  if (type==='week') return addDaysYMD(endYmd, -6);
+  if (type==='month'){ const [y,m] = endYmd.split('-').map(Number); return `${y}-${String(m).padStart(2,'0')}-01`; }
+  if (type==='year'){ const [y] = endYmd.split('-'); return `${y}-01-01`; }
+  return endYmd;
+}
+
+function minsRemainingIfToday(ymd){
+  if (ymd !== todayYMD()) return null;
+  const now = new Date(); const end = new Date(now); end.setHours(23,59,59,999);
+  return Math.max(0, Math.round((end - now)/60000));
+}
+
+/* ===== Firestore helpers ===== */
+function col(uid){ return db.collection(`users/${uid}/activities`); }
+async function fetchDay(uid, ymd){
+  const snap = await col(uid).where('timestamp','>=',dayStart(ymd)).where('timestamp','<=',dayEnd(ymd)).orderBy('timestamp').get();
+  const a=[]; snap.forEach(d=>a.push({tag:d.data().tag, timestamp:d.data().timestamp}));
+  return a;
+}
+async function fetchRange(uid, start, end){
+  const snap = await col(uid).where('timestamp','>=',dayStart(start)).where('timestamp','<=',dayEnd(end)).orderBy('timestamp').get();
+  const a=[]; snap.forEach(d=>a.push({tag:d.data().tag, timestamp:d.data().timestamp}));
+  return a;
+}
+
+/* ===== Aggregation ===== */
+function buildDayEvents(items, ymd, nextFirstTag){
+  const ev=[];
+  if (items.length){
+    ev.push({tag:items[0].tag,timestamp:dayStart(ymd)});
+    items.forEach(it=>ev.push({tag:it.tag,timestamp:it.timestamp}));
+    const end = dayEnd(ymd); const last = items[items.length-1].timestamp;
+    ev.push({tag:(last<end? (nextFirstTag||'Sleep'): items[items.length-1].tag), timestamp:end});
+  } else {
+    ev.push({tag:'Sleep', timestamp:dayStart(ymd)});
+    ev.push({tag:'Sleep', timestamp:dayEnd(ymd)});
+  }
+  return ev;
+}
+function minutesPerTag(events){
+  const map={};
+  for(let i=1;i<events.length;i++){
+    const t1=new Date(events[i-1].timestamp), t2=new Date(events[i].timestamp);
+    const diff=Math.round((t2-t1)/60000); if (diff<=0) continue;
+    const tag=events[i].tag; map[tag]=(map[tag]||0)+diff;
+  }
+  return map;
+}
+function splitBuckets(perTag){
+  let non=0, good=0, neutral=0, bad=0, ent=0;
+  for (const [tag,min] of Object.entries(perTag)){
+    const cat = tagCategory(tag);
+    if (cat==='non') non += min;
+    else if (cat==='good') good += min;
+    else if (cat==='bad') bad += min;
+    else { if (tag==='Entertainment') ent += min; else neutral += min; }
+  }
+  const avail = Math.max(0, 1440 - non);
+  const tol = Math.round(avail * 20 / 100); // 20% entertainment neutro
+  const entNeutral = Math.min(ent, tol);
+  const entOver = Math.max(0, ent - tol);
+  neutral += entNeutral; bad += entOver;
+  return {non, good, neutral, bad, avail};
+}
+function rankGest(perTag){
+  const rows = Object.entries(perTag).filter(([tag]) => tagCategory(tag)!=='non');
+  const total = rows.reduce((a,[,m])=>a+m,0);
+  rows.sort((a,b)=>b[1]-a[1]);
+  return {rows,total};
+}
+function percent(n, tot){ return tot>0 ? Math.round(100*n/tot) : 0; }
+
+/* ===== Charts ===== */
+let dailyDonut, perTrend;
+function destroyChart(ch){ if(ch) ch.destroy(); }
+
+/* ===== Render: Day ===== */
+async function renderDay(uid, ymd){
+  const items = await fetchDay(uid, ymd);
+  const next = addDaysYMD(ymd, 1);
+  const nextSnap = await col(uid).where('timestamp','>=',dayStart(next)).orderBy('timestamp').limit(1).get();
+  let nextFirst = null; nextSnap.forEach(d=> nextFirst = d.data().tag);
+
+  const events = buildDayEvents(items, ymd, nextFirst);
+  const perTag = minutesPerTag(events);
+  const totals = splitBuckets(perTag);
+
+  // donut
+  destroyChart(dailyDonut);
+  dailyDonut = new Chart(document.getElementById('dailyDonut').getContext('2d'), {
+    type:'doughnut',
+    data:{ labels:['Produttivo','Neutro','Spreco'], datasets:[{ data:[totals.good, totals.neutral, totals.bad], backgroundColor:['#06c167','#6b7280','#ff2d55'] }] },
+    options:{ responsive:true, maintainAspectRatio:false, cutout:'60%', plugins:{legend:{position:'bottom', labels:{ boxWidth:10, font:{ size:11 }}}}}
+  });
+
+  // kpi
+  $('#d_avail').textContent = fmtHM(totals.avail);
+  const rem = minsRemainingIfToday(ymd);
+  $('#d_remaining').textContent = (rem===null ? '—' : fmtHM(rem));
+  $('#d_focus').textContent = (totals.avail? Math.round(100*totals.good/totals.avail):0) + '%';
+
+  // barra % su disponibile
+  const gP = percent(totals.good, totals.avail);
+  const nP = percent(totals.neutral, totals.avail);
+  const bP = percent(totals.bad, totals.avail);
+  $('#d_bar_good').style.width = gP + '%';
+  $('#d_bar_neut').style.width = (gP+nP) + '%';
+  $('#d_bar_wast').style.width = (gP+nP+bP) + '%';
+
+  // classifica (righe colorate)
+  const {rows,total} = rankGest(perTag);
+  const tbody = $('#dailyRank'); tbody.innerHTML='';
+  rows.forEach(([tag,min])=>{
+    const cat = tagCategory(tag);
+    const cls = (cat==='good'?'good':cat==='bad'?'bad':(cat==='non'?'':'neutral'));
+    const pct = percent(min, total);
+    tbody.innerHTML += `<tr class="${cls}"><td>${tag}</td><td>${fmtHM(min)}</td><td>${pct}%</td></tr>`;
+  });
+}
+
+/* ===== Render: Period (week/month/year) ===== */
+async function renderPeriod(uid){
+  const type = $('#perType').value;
+  const endYmd = $('#perEnd').value || todayYMD();
+  const startYmd = periodStart(endYmd, type);
+
+  // fetch intervallo
+  const snap = await fetchRange(uid, startYmd, endYmd);
+
+  // per giorno
+  const byDate = new Map();
+  snap.forEach(d=>{
+    const k = String(d.timestamp).slice(0,10);
+    if(!byDate.has(k)) byDate.set(k,[]);
+    byDate.get(k).push({tag:d.tag, timestamp:d.timestamp});
+  });
+
+  const days=[]; for (let d=startYmd; d<=endYmd; d=addDaysYMD(d,1)) days.push(d);
+
+  // mappa primo tag del giorno
+  const firstTag = {};
+  for (const d of days){
+    const arr = (byDate.get(d)||[]).sort((a,b)=> (a.timestamp<b.timestamp?-1:1));
+    firstTag[d] = arr.length ? arr[0].tag : null;
+  }
+
+  // serie % e ranking cumulato
+  const serGood=[], serNeutral=[], serBad=[], perTagAll={};
+
+  for (let i=0;i<days.length;i++){
+    const d = days[i];
+    const arr = (byDate.get(d)||[]).sort((a,b)=> (a.timestamp<b.timestamp?-1:1));
+    const nextFirst = firstTag[days[i+1]] || 'Sleep';
+    const events = buildDayEvents(arr, d, nextFirst);
+    const perTag = minutesPerTag(events);
+    const t = splitBuckets(perTag);
+
+    serGood.push( percent(t.good, t.avail) );
+    serNeutral.push( percent(t.neutral, t.avail) );
+    serBad.push( percent(t.bad, t.avail) );
+
+    for (const [tag,min] of Object.entries(perTag)){
+      if (tagCategory(tag)==='non') continue;
+      perTagAll[tag] = (perTagAll[tag]||0) + min;
+    }
+  }
+
+  // trend
+  destroyChart(perTrend);
+  const ctx = document.getElementById('perTrend').getContext('2d');
+  perTrend = new Chart(ctx, {
+    type:'line',
+    data:{ labels: days.map((_,i)=>i+1),
+      datasets:[
+        {label:'Produttivo', data:serGood, borderColor:'#06c167', backgroundColor:'transparent', tension:.3, pointRadius:0, borderWidth:2, hidden: !$('#tgGood').checked},
+        {label:'Neutro',     data:serNeutral, borderColor:'#6b7280', backgroundColor:'transparent', tension:.3, pointRadius:0, borderWidth:2, hidden: !$('#tgNeutral').checked},
+        {label:'Spreco',     data:serBad, borderColor:'#ff2d55', backgroundColor:'transparent', tension:.3, pointRadius:0, borderWidth:2, hidden: !$('#tgBad').checked}
+      ]
+    },
+    options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{ y:{ beginAtZero:true, max:100 } } }
+  });
+
+  // classifica periodo
+  const entries = Object.entries(perTagAll);
+  entries.sort((a,b)=>b[1]-a[1]);
+  const total = entries.reduce((a,[,m])=>a+m,0);
+  const tbody = $('#perRank'); tbody.innerHTML='';
+  entries.forEach(([tag,min])=>{
+    const cat = tagCategory(tag);
+    const cls = (cat==='good'?'good':cat==='bad'?'bad':(cat==='non'?'':'neutral'));
+    const pct = percent(min, total);
+    tbody.innerHTML += `<tr class="${cls}"><td>${tag}</td><td>${fmtHM(min)}</td><td>${pct}%</td></tr>`;
+  });
+}
+
+/* ===== Orchestrator ===== */
+let currentUid=null;
+async function renderAll(){
+  const ymd = $('#dayPick').value;
+  $('#loading').textContent = 'Caricamento…';
+  await renderDay(currentUid, ymd);
+  await renderPeriod(currentUid); // usa i controlli del blocco “Periodo”
+  $('#loading').textContent = 'Pronto';
+}
+
+/* ===== Boot ===== */
+document.addEventListener('DOMContentLoaded', ()=>{
+  const t = todayYMD();
+  $('#dayPick').value = t;
+  $('#perEnd').value = t;
+
+  // auth
+  auth.onAuthStateChanged(async u=>{
+    if(!u){ location.href='index.html'; return; }
+    currentUid = u.uid; $('#userLabel').textContent = u.email || u.uid;
+    await renderAll();
+  });
+
+  // day nav
+  $('#prevDay').addEventListener('click', ()=>{ $('#dayPick').value = addDaysYMD($('#dayPick').value, -1); renderAll(); });
+  $('#nextDay').addEventListener('click', ()=>{ $('#dayPick').value = addDaysYMD($('#dayPick').value, 1); renderAll(); });
+  $('#dayPick').addEventListener('change', renderAll);
+
+  // period controls
+  $('#perApply').addEventListener('click', ()=> renderPeriod(currentUid));
+  ['tgGood','tgNeutral','tgBad'].forEach(id=>{
+    document.getElementById(id).addEventListener('change', ()=>{
+      if (!perTrend) return;
+      perTrend.data.datasets[0].hidden = !$('#tgGood').checked;
+      perTrend.data.datasets[1].hidden = !$('#tgNeutral').checked;
+      perTrend.data.datasets[2].hidden = !$('#tgBad').checked;
+      perTrend.update();
+    });
+  });
+
+  // gear panel + mapping UI
+  const renderMapList = ()=>{
+    const box = $('#mapList'); box.innerHTML='';
+    const entries = Object.entries(customMap);
+    if (!entries.length){ box.innerHTML = `<span class="pill muted">Nessuna mappatura</span>`; return; }
+    entries.forEach(([tag,cat])=>{
+      const color = cat==='good'?'var(--good)':cat==='bad'?'var(--bad)':cat==='non'?'#8b5cf6':'var(--neutral)';
+      box.innerHTML += `<span class="pill" style="border-color:${color}; color:${color}">${tag} → ${cat}</span>`;
+    });
+  };
+  renderMapList();
+
+  $('#openGear').addEventListener('click', ()=>{
+    const p = $('#gearPanel'); const open = !p.classList.contains('show');
+    p.classList.toggle('show', open);
+    p.setAttribute('aria-hidden', open?'false':'true');
+    renderMapList();
+  });
+  $('#saveMap').addEventListener('click', ()=>{
+    const name = String($('#tagName').value||'').trim(); if (!name) return;
+    const cat = $('#tagCat').value;
+    customMap[name] = cat; saveCustomMap(customMap);
+    renderMapList(); renderAll();
+  });
+  $('#resetMap').addEventListener('click', ()=>{
+    if(!confirm('Cancellare tutte le mappature personalizzate?')) return;
+    customMap = {}; saveCustomMap(customMap);
+    renderMapList(); renderAll();
+  });
+});
+</script>
+</body>
+</html>
