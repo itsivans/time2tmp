@@ -1,0 +1,351 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8" />
+  <title>Activity Tracker — Accesso</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" href="icon-192.png">
+  <meta name="theme-color" content="#2196f3">
+
+  <!-- Firebase (compat) -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+
+  <style>
+    :root {
+      --primary:#2196f3;
+      --muted:#666;
+      --border:#ddd;
+    }
+    html, body { height: 100%; }
+    body { font-family: Arial, system-ui, sans-serif; margin: 12px; background:#fff; }
+
+    input, select, button { width: 100%; padding: 12px; margin: 6px 0; font-size: 16px; box-sizing: border-box; }
+    .card { border:1px solid var(--border); border-radius:8px; padding:12px; margin:12px 0; background:#fff; }
+    .row { display:flex; gap:8px; }
+    .row > * { flex:1; }
+    .muted { color:var(--muted); font-size:14px; }
+    .hidden { display:none; }
+    .link { background:var(--primary); color:#fff; border:none; border-radius:6px; margin-top:16px; font-weight:bold; width:100%; }
+
+    /* Chip utente minimale (solo nome + logout emoji) */
+    .statuschip {
+      position: fixed; top: 8px; right: 8px;
+      display: none; align-items: center; gap: 8px;
+      background: rgba(0,0,0,.05); color:#333;
+      padding: 4px 10px; border-radius: 999px;
+      font-size: 12px; line-height: 1; opacity: .6;
+      transition: opacity .2s, transform .2s;
+      z-index: 1000;
+    }
+    .statuschip.show { display: inline-flex; }
+    .statuschip:hover { opacity: 1; }
+    .who { cursor: pointer; user-select: none; }
+    .icon-btn {
+      background: transparent; border: none; padding: 0 2px; margin: 0;
+      font-size: 15px; line-height: 1; cursor: pointer; opacity: .85;
+    }
+
+    /* Popover nickname (locale) */
+    .nickpop {
+      position: fixed; top: 42px; right: 8px;
+      display: none; width: min(280px, 92vw);
+      background: #fff; border: 1px solid var(--border); border-radius: 10px;
+      box-shadow: 0 10px 30px rgba(0,0,0,.18); padding: 10px;
+      z-index: 1001;
+    }
+    .nickpop.show { display: block; }
+    .nickpop .row { gap: 6px; }
+    .sm { width:auto; padding: 8px 12px; border:none; border-radius:6px; background:#eaeaea; cursor:pointer; }
+    .sm.primary { background: var(--primary); color: #fff; }
+    .sm.ghost { background:#f6f6f6; color:#333; }
+
+    /* Toast */
+    #toast { position:fixed; left:50%; bottom:24px; transform:translateX(-50%);
+      background:#323232; color:#fff; padding:10px 14px; border-radius:8px;
+      opacity:0; pointer-events:none; transition:opacity .2s, transform .2s; z-index:9999; }
+    #toast.show { opacity:1; transform:translateX(-50%) translateY(-6px); }
+
+    /* === Splash / pre-auth: elimina il flash della login === */
+    .splash {
+      position: fixed; inset: 0;
+      display: flex; align-items: center; justify-content: center;
+      background: #fff; color: #555; font: 14px/1.2 system-ui, Arial;
+      z-index: 2000;
+    }
+    /* In pre-auth nascondo tutto tranne lo splash */
+    .preauth #authBox, .preauth #appBox, .preauth #statuschip { display:none !important; }
+    #splash { display:none; }
+    .preauth #splash { display:flex; }
+
+    /* Piccolo miglioramento per preferenze colore scuro di sistema */
+    @media (prefers-color-scheme: dark) {
+      :root { --border:#2c2c2c; --muted:#aaa; }
+      body { background:#121212; color:#eaeaea; }
+      .card { background:#1a1a1a; border-color:#2a2a2a; }
+      .statuschip { background: rgba(255,255,255,.07); color:#ddd; }
+      .nickpop { background:#1a1a1a; border-color:#2a2a2a; }
+      #toast { background:#222; }
+      .splash { background:#121212; color:#bbb; }
+      .link { color:#fff; }
+      input, select, button { background:#141414; color:#eaeaea; border:1px solid #2a2a2a; }
+      .sm { background:#2a2a2a; color:#eaeaea; }
+      .sm.ghost { background:#1f1f1f; color:#eaeaea; }
+    }
+  </style>
+</head>
+<body class="preauth">
+  <noscript>
+    <div class="card" style="margin-top:20px">
+      <strong>⚠️ JavaScript disabilitato.</strong> L'app richiede JavaScript per funzionare.
+    </div>
+  </noscript>
+
+  <!-- Splash durante l'inizializzazione Auth (evita flash di login) -->
+  <div id="splash" class="splash" aria-live="polite">Avvio…</div>
+
+  <!-- LOGIN (inizialmente nascosto per evitare flash) -->
+  <div id="authBox" class="card hidden">
+    <h3>🔐 Accedi</h3>
+    <div class="row">
+      <input id="email" type="email" placeholder="Email" autocomplete="email">
+      <input id="pass" type="password" placeholder="Password" autocomplete="current-password">
+    </div>
+    <div class="row">
+      <button id="loginBtn">Accedi</button>
+      <button id="signupBtn">Registrati</button>
+    </div>
+    <p class="muted">Devi essere loggato per inserire attività e vedere le statistiche.</p>
+  </div>
+
+  <!-- CHIP UTENTE MINIMALE (solo nome + emoji logout) -->
+  <div id="statuschip" class="statuschip" aria-live="polite">
+    <span id="who" class="who" title="Clicca per impostare un nickname (solo su questo dispositivo)"></span>
+    <button id="logoutBtn" class="icon-btn" title="Logout" aria-label="Logout">🚪</button>
+  </div>
+
+  <!-- Popover nickname -->
+  <div id="nickPop" class="nickpop" role="dialog" aria-modal="true" aria-labelledby="nickTitle">
+    <div id="nickTitle" class="muted" style="margin-bottom:6px;">Nickname locale (non salvato nel cloud)</div>
+    <div class="row">
+      <input id="nickInput" type="text" placeholder="Il tuo nickname (solo qui)">
+      <button id="saveNickBtn" class="sm primary">Salva</button>
+      <button id="clearNickBtn" class="sm ghost">Rimuovi</button>
+      <button id="cancelNickBtn" class="sm">Chiudi</button>
+    </div>
+  </div>
+
+  <!-- APP (quando loggato) -->
+  <div id="appBox" class="hidden">
+    <div class="card" style="margin-top: 28px;">
+      <h3>📥 Inserisci attività</h3>
+      <input type="text" id="activity" placeholder="Attività...">
+      <input type="datetime-local" id="dateTime">
+      <select id="tag">
+        <option value="">--Tag--</option>
+        <option>Entertainment</option>
+        <option>Survive</option>
+        <option>Study</option>
+        <option>Work</option>
+        <option>Nut</option>
+        <option>Slavery</option>
+        <option>Productivity</option>
+        <option>Waste</option>
+        <option>Chess</option>
+        <option>Gym</option>
+        <option>Bike</option>
+        <option>Holiday</option>
+        <option>Chinese</option>
+        <option>Sleep</option>
+        <option>Book</option>
+      </select>
+      <button id="addBtn">➕ Aggiungi</button>
+      <div id="msg" class="muted"></div>
+    </div>
+
+    <a href="statistics.html"><button class="link">📊 Vai alle statistiche</button></a>
+  </div>
+
+  <!-- Toast -->
+  <div id="toast"></div>
+
+  <script>
+    // === Firebase init ===
+    const firebaseConfig = {
+      apiKey: "AIzaSyDEq8aUhdBPcjYM6H6909DldXAdjhRNWbI",
+      authDomain: "time-ff7ed.firebaseapp.com",
+      projectId: "time-ff7ed",
+      storageBucket: "time-ff7ed.appspot.com",
+      messagingSenderId: "842285944784",
+      appId: "1:842285944784:web:de483548153abc956033d5",
+      measurementId: "G-ZR0BNWGVXJ"
+    };
+    if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+
+    // Offline persistence
+    firebase.firestore().enablePersistence({synchronizeTabs:true}).catch(e=>{
+      console.warn('Persistence non attiva:', e.code);
+    });
+
+    const auth = firebase.auth();
+    const db   = firebase.firestore();
+
+    // === Helpers UI ===
+    const $ = s => document.querySelector(s);
+    const authBox   = $('#authBox');
+    const appBox    = $('#appBox');
+    const statuschip= $('#statuschip');
+    const whoEl     = $('#who');
+    const msg       = $('#msg');
+    const toastEl   = $('#toast');
+    const nickPop   = $('#nickPop');
+    const nickInput = $('#nickInput');
+
+    const NICK_KEY = 'timeNickname';
+
+    function setMsg(t){ msg.textContent = t || ''; }
+    function showToast(text){
+      toastEl.textContent = text;
+      toastEl.classList.add('show');
+      setTimeout(()=>toastEl.classList.remove('show'), 1600);
+    }
+    function getLocalISODateTimeNow(){
+      const now = new Date();
+      now.setSeconds(0,0);
+      const tzOffset = -now.getTimezoneOffset();
+      return new Date(now.getTime() + tzOffset * 60000).toISOString().slice(0,16);
+    }
+    function loadNick(){ try { return localStorage.getItem(NICK_KEY) || ''; } catch { return ''; } }
+    function saveNick(v){ try { localStorage.setItem(NICK_KEY, v||''); } catch {} }
+    function clearNick(){ try { localStorage.removeItem(NICK_KEY); } catch {} }
+    function nameFromEmail(email){ return (email || '').split('@')[0]; }
+    function updateWho(user){
+      const nick = loadNick().trim();
+      whoEl.textContent = nick || nameFromEmail(user.email) || 'utente';
+    }
+    function toggleNickPop(show){
+      if (show) {
+        const user = auth.currentUser;
+        const current = (loadNick().trim()) || (user ? nameFromEmail(user.email) : '');
+        nickInput.value = current;
+        nickPop.classList.add('show');
+      } else {
+        nickPop.classList.remove('show');
+      }
+    }
+
+    // === Auth state ===
+    let firstAuthEventHandled = false;
+    auth.onAuthStateChanged(user => {
+      if (user) {
+        authBox.classList.add('hidden');
+        appBox.classList.remove('hidden');
+        statuschip.classList.add('show');
+        updateWho(user);
+
+        const dt = $('#dateTime');
+        if (!dt.value) dt.value = getLocalISODateTimeNow();
+
+        const act = $('#activity');
+        act.onkeydown = (e) => { if (e.key === 'Enter') $('#addBtn').click(); };
+        act.onfocus   = () => { if (!dt.value) dt.value = getLocalISODateTimeNow(); };
+
+      } else {
+        appBox.classList.add('hidden');
+        authBox.classList.remove('hidden');
+        statuschip.classList.remove('show');
+        toggleNickPop(false);
+      }
+
+      // Rimuovo lo splash e lo stato "preauth" al PRIMO evento
+      if (!firstAuthEventHandled) {
+        document.body.classList.remove('preauth');
+        firstAuthEventHandled = true;
+      }
+    });
+
+    // === Auth actions ===
+    $('#loginBtn').onclick = async () => {
+      const email = $('#email').value.trim();
+      const pass  = $('#pass').value;
+      if (!email || !pass) return setMsg('Inserisci email e password.');
+      try { await auth.signInWithEmailAndPassword(email, pass); setMsg('Accesso eseguito.'); }
+      catch(e){ console.error(e); setMsg(mapAuthError(e.code, e.message)); }
+    };
+    $('#signupBtn').onclick = async () => {
+      const email = $('#email').value.trim();
+      const pass  = $('#pass').value;
+      if (!email || !pass) return setMsg('Inserisci email e password.');
+      try { await auth.createUserWithEmailAndPassword(email, pass); await auth.currentUser.sendEmailVerification(); setMsg('Registrazione ok. Verifica la tua email.'); }
+      catch(e){ console.error(e); setMsg(mapAuthError(e.code, e.message)); }
+    };
+    $('#logoutBtn').onclick = () => auth.signOut();
+
+    function mapAuthError(code, fallback){
+      const map = {
+        'auth/invalid-email': 'Email non valida.',
+        'auth/user-not-found': 'Utente non trovato.',
+        'auth/wrong-password': 'Password errata.',
+        'auth/email-already-in-use': 'Email già in uso.',
+        'auth/too-many-requests': 'Troppe richieste, riprova più tardi.'
+      };
+      return map[code] || fallback || 'Errore.';
+    }
+
+    // === Nickname (solo locale) ===
+    whoEl.onclick = () => toggleNickPop(true);
+    $('#cancelNickBtn').onclick = () => toggleNickPop(false);
+    $('#saveNickBtn').onclick = () => {
+      saveNick(nickInput.value.trim());
+      toggleNickPop(false);
+      if (auth.currentUser) updateWho(auth.currentUser);
+      showToast('✅ Nickname aggiornato');
+    };
+    $('#clearNickBtn').onclick = () => {
+      clearNick();
+      toggleNickPop(false);
+      if (auth.currentUser) updateWho(auth.currentUser);
+      showToast('ℹ️ Nickname rimosso');
+    };
+
+    // Chiudi popover cliccando fuori
+    document.addEventListener('click', (e)=>{
+      if (!nickPop.classList.contains('show')) return;
+      const withinPop = nickPop.contains(e.target);
+      const clickedWho = whoEl.contains(e.target);
+      if (!withinPop && !clickedWho) toggleNickPop(false);
+    });
+
+    // === Add activity ===
+    $('#addBtn').onclick = async () => {
+      const user = auth.currentUser;
+      if (!user) return setMsg('Devi essere loggato.');
+
+      const activity = $('#activity').value.trim();
+      const tag      = $('#tag').value;
+      let   dateTime = $('#dateTime').value;
+
+      if (!activity || !tag) return setMsg('Inserisci attività e tag!');
+      if (!dateTime) dateTime = getLocalISODateTimeNow();
+
+      try {
+        await db.collection(`users/${user.uid}/activities`).add({ activity, tag, timestamp: dateTime });
+        $('#activity').value = ''; $('#dateTime').value = ''; $('#tag').value = '';
+        setMsg('Attività salvata.'); showToast('✅ Attività inserita');
+      } catch (e) {
+        console.error(e);
+        setMsg('Errore nel salvataggio: ' + e.message);
+      }
+    };
+
+    // === Service Worker ===
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('service-worker.js')
+        .then(()=>console.log('✅ Service Worker registrato'))
+        .catch(err=>console.warn('❌ SW errore:', err));
+    }
+  </script>
+</body>
+</html>
