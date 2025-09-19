@@ -1,0 +1,32 @@
+:root {
+  /* Light */
+  --bg:#ffffff; --text:#0b1320; --muted:#6b7280; --line:#e5e7eb; --card:#f8fafc;
+  --link:#1e88e5;
+
+  /* Accenti vividi */
+  --good:#06c167; --neutral:#6b7280; --bad:#ff2d55;
+  --good-bg:#e9fff4; --neutral-bg:#f3f4f6; --bad-bg:#ffe9ee;
+
+  /* Componenti */
+  --toast:#111827; --toastText:#ffffff;
+}
+
+[data-theme="dark"] {
+  --bg:#0b1118; --text:#e6edf3; --muted:#94a3b8; --line:#1f2937; --card:#0f1620;
+  --link:#62a8ff;
+
+  --good:#22d47b; --neutral:#a6adbb; --bad:#ff4d6d;
+  --good-bg:#0d2a1e; --neutral-bg:#141a23; --bad-bg:#2a0f15;
+
+  --toast:#0b1118; --toastText:#e6edf3;
+}
+
+/* Utility opzionali (non invasive): */
+.theme-btn {
+  border:1px solid var(--line); background:transparent; color:var(--text);
+  border-radius:8px; padding:8px 10px; cursor:pointer; font-size:14px;
+}
+.link-btn {
+  background:var(--link); color:#fff; padding:8px 10px; border-radius:8px; text-decoration:none; font-size:14px;
+}
+.card { background:var(--card); border:1px solid var(--line); border-radius:12px; }
