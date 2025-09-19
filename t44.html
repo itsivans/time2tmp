@@ -1,0 +1,544 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Statistiche — Semplici</title>
+
+<!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<!-- Firebase (compat) -->
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+
+<style>
+  :root{
+    --bg:#ffffff; --text:#1f2328; --muted:#6b7280; --line:#e5e7eb;
+    --good:#10b981; --neutral:#f59e0b; --bad:#ef4444; --primary:#1e88e5; --card:#f8fafc;
+  }
+  *{box-sizing:border-box}
+  body{margin:0; font-family:system-ui, -apple-system, Segoe UI, Roboto, Arial; background:var(--bg); color:var(--text)}
+  header{padding:12px 16px; border-bottom:1px solid var(--line); display:flex; align-items:center; gap:10px; flex-wrap:wrap}
+  header h1{margin:0; font-size:18px; font-weight:800}
+  header .right{margin-left:auto; display:flex; gap:8px; align-items:center}
+  a.btn{color:#fff; background:#2196f3; padding:8px 10px; border-radius:8px; text-decoration:none; font-size:14px}
+
+  .wrap{padding:14px 16px; display:grid; gap:14px}
+  .card{background:var(--card); border:1px solid var(--line); border-radius:12px; padding:12px}
+  .title{margin:0 0 6px; font-size:16px; font-weight:800}
+  .mini{font-size:12px; color:var(--muted)}
+  .row{display:flex; gap:12px; flex-wrap:wrap; align-items:flex-start}
+  .col{flex:1 1 320px; max-width:520px}
+  .chartBox{width:100%; max-width:360px; margin:auto; position:relative}
+  .chartBox canvas{width:100% !important; height:220px !important; display:block}
+  .chartBox.small canvas{height:160px !important}
+  .chips{display:flex; gap:6px; flex-wrap:wrap; margin-top:8px}
+  .chip{padding:4px 8px; border:1px solid var(--line); border-radius:999px; background:#fff; font-size:12px; white-space:nowrap}
+  .bar{height:10px; width:100%; background:#eef2f7; border-radius:999px; overflow:hidden; margin-top:10px}
+  .bar > span{display:block; height:100%}
+  .bar .good{background:var(--good)}
+  .bar .neutral{background:var(--neutral)}
+  .bar .bad{background:var(--bad)}
+  table{width:100%; border-collapse:collapse; margin-top:8px}
+  th, td{border:1px solid var(--line); padding:6px 8px; font-size:14px}
+  th{background:#fff; text-align:left}
+  .muted{color:var(--muted)}
+  .badge{padding:2px 8px; border-radius:999px; font-size:12px; border:1px solid var(--line); background:#fff}
+  .badge.up{color:var(--good); border-color:#c7f8e9; background:#eafff7}
+  .badge.down{color:var(--bad); border-color:#ffc7c7; background:#fff0f0}
+
+  .toolbar{display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin:6px 0}
+  .toolbar input[type="date"], .toolbar select{padding:8px 10px; border:1px solid var(--line); border-radius:8px; font-size:14px}
+  .btn{padding:8px 12px; border-radius:8px; border:1px solid var(--line); background:#fff; cursor:pointer; font-size:14px}
+  .btn.primary{background:#1e88e5; color:#fff; border-color:#1e88e5}
+  #loading{padding:6px 0; font-size:14px; color:#555}
+</style>
+</head>
+<body>
+<header>
+  <h1>Statistiche</h1>
+  <div class="right">
+    <span id="userLabel" class="mini">—</span>
+    <a class="btn" href="index.html">↩︎ Inserimento</a>
+  </div>
+</header>
+
+<div class="wrap">
+  <!-- CONTROLLI -->
+  <div class="card">
+    <div class="toolbar">
+      <span class="mini">Giorno:</span>
+      <input type="date" id="dayPick">
+      <button class="btn primary" id="btnReload">Aggiorna</button>
+      <span id="loading" class="mini">Caricamento…</span>
+    </div>
+    <div class="mini">Suggerimento: scegli un giorno per vedere il dettaglio. Di default è oggi.</div>
+  </div>
+
+  <!-- SEZIONE 1: OGGI (o il giorno selezionato) -->
+  <section class="card">
+    <h2 class="title">Andamento del giorno</h2>
+    <div class="row">
+      <div class="col">
+        <div class="mini">Distribuzione del tempo disponibile (bene / neutro / spreco)</div>
+        <div class="chartBox"><canvas id="dailyDonut"></canvas></div>
+        <div class="chips">
+          <span class="chip">Disponibile: <b id="d_avail">—</b></span>
+          <span class="chip">Focus: <b id="d_focus">—%</b></span>
+          <span class="chip">Rimanente (se oggi): <b id="d_remaining">—</b></span>
+        </div>
+        <div class="bar">
+          <span id="d_bar_good" class="good" style="width:0%"></span>
+          <span id="d_bar_neut" class="neutral" style="width:0%"></span>
+          <span id="d_bar_wast" class="bad" style="width:0%"></span>
+        </div>
+      </div>
+      <div class="col">
+        <div class="mini">Classifica del giorno (tempo gestibile, dal maggiore al minore)</div>
+        <table>
+          <thead><tr><th>Tag</th><th>Min</th><th>%</th></tr></thead>
+          <tbody id="dailyRank"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- SEZIONE 2: SETTIMANA ATTUALE (toggle semplice) -->
+  <section class="card">
+    <h2 class="title">Settimana attuale</h2>
+    <div class="mini">Panoramica veloce. La settimana considera il giorno selezionato come fine finestra di 7 giorni.</div>
+    <div class="row">
+      <div class="col">
+        <div class="mini">Focus giornaliero (ultimi 7 giorni)</div>
+        <div class="chartBox small"><canvas id="weekTrend"></canvas></div>
+        <div class="chips">
+          <span class="chip">Media focus: <b id="w_avg">—%</b></span>
+          <span class="chip">Spreco su disponibile: <b id="w_waste">—%</b></span>
+          <span class="chip">Δ 7g: <b id="w_delta" class="badge">—</b></span>
+        </div>
+      </div>
+      <div class="col">
+        <div class="mini">Classifica settimanale (tempo gestibile)</div>
+        <table>
+          <thead><tr><th>Tag</th><th>Min</th><th>%</th></tr></thead>
+          <tbody id="weekRank"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- SEZIONE 3: CONFRONTO PERIODI (semplice) -->
+  <section class="card">
+    <h2 class="title">Confronta periodi</h2>
+    <div class="toolbar">
+      <select id="pA_type">
+        <option value="week">Settimana</option>
+        <option value="month" selected>Mese</option>
+        <option value="year">Anno</option>
+      </select>
+      <span class="mini">Fine periodo A:</span>
+      <input type="date" id="pA_end">
+      <select id="pB_type">
+        <option value="week">Settimana</option>
+        <option value="month" selected>Mese</option>
+        <option value="year">Anno</option>
+      </select>
+      <span class="mini">Fine periodo B:</span>
+      <input type="date" id="pB_end">
+      <button class="btn" id="btnCompare">Confronta</button>
+    </div>
+    <div class="row">
+      <div class="col">
+        <div class="mini">Periodo A</div>
+        <div class="chartBox small"><canvas id="cmpA"></canvas></div>
+        <div class="chips">
+          <span class="chip">Focus A: <b id="cmpA_focus">—%</b></span>
+        </div>
+      </div>
+      <div class="col">
+        <div class="mini">Periodo B</div>
+        <div class="chartBox small"><canvas id="cmpB"></canvas></div>
+        <div class="chips">
+          <span class="chip">Focus B: <b id="cmpB_focus">—%</b></span>
+          <span class="chip">Δ A−B: <b id="cmp_delta" class="badge">—</b></span>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<script>
+/* ===================== FIREBASE INIT ===================== */
+const firebaseConfig = {
+  apiKey: "AIzaSyDEq8aUhdBPcjYM6H6909DldXAdjhRNWbI",
+  authDomain: "time-ff7ed.firebaseapp.com",
+  projectId: "time-ff7ed",
+  storageBucket: "time-ff7ed.appspot.com",
+  messagingSenderId: "842285944784",
+  appId: "1:842285944784:web:de483548153abc956033d5",
+  measurementId: "G-ZR0BNWGVXJ"
+};
+if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const db   = firebase.firestore();
+
+/* ===================== COSTANTI & CATEGORIE ===================== */
+const NON_G = ['Sleep','Work','Survive','Slavery']; // non gestibile (fuori disponibile)
+const GOOD  = ['Study','Productivity','Book','Chinese','Gym','Bike','Chess']; // bene
+const NEUT  = ['Entertainment','Holiday','Nut']; // neutro
+const WAST  = ['Waste']; // spreco
+
+const TOL   = 20; // % Entertainment consentita su tempo disponibile (oltre → spreco)
+
+const $ = s => document.querySelector(s);
+const fmtHM = m => `${Math.floor(m/60)}h ${String(m%60).padStart(2,'0')}m`;
+
+/* ===================== DATE UTILS ===================== */
+function todayLocalYMD(){
+  const now = new Date();
+  const tzOffset = -now.getTimezoneOffset();
+  const local = new Date(now.getTime() + tzOffset*60000);
+  return local.toISOString().slice(0,10);
+}
+function addDaysYMD(ymd, delta){
+  const [y,m,d] = ymd.split('-').map(Number);
+  const dt = new Date(Date.UTC(y, m-1, d));
+  dt.setUTCDate(dt.getUTCDate()+delta);
+  const y2 = dt.getUTCFullYear(), m2 = String(dt.getUTCMonth()+1).padStart(2,'0'), d2 = String(dt.getUTCDate()).padStart(2,'0');
+  return `${y2}-${m2}-${d2}`;
+}
+const dayStart = d => `${d}T00:00`;
+const dayEnd   = d => `${d}T23:59:59`;
+
+function periodStart(endYmd, type){
+  if (type==='week') return addDaysYMD(endYmd, -6);
+  if (type==='month'){ const [y,m] = endYmd.split('-').map(Number); return `${y}-${String(m).padStart(2,'0')}-01`; }
+  if (type==='year'){ const [y] = endYmd.split('-'); return `${y}-01-01`; }
+  return endYmd;
+}
+function periodHuman(type){ return type==='week' ? '7 giorni' : (type==='month' ? 'mese' : 'anno'); }
+
+function minsUntilEndOfDayFor(ymd){
+  const today = todayLocalYMD();
+  if (ymd !== today) return null;
+  const now = new Date();
+  const end = new Date(now); end.setHours(23,59,59,999);
+  return Math.max(0, Math.round((end - now)/60000));
+}
+
+/* ===================== FIRESTORE HELPERS ===================== */
+function userCol(uid){ return db.collection(`users/${uid}/activities`); }
+
+async function fetchDay(uid, ymd) {
+  const snap = await userCol(uid)
+    .where('timestamp','>=',dayStart(ymd))
+    .where('timestamp','<=',dayEnd(ymd))
+    .orderBy('timestamp').get();
+  const items = []; snap.forEach(doc => items.push({ tag: doc.data().tag, timestamp: doc.data().timestamp }));
+  return items;
+}
+
+async function fetchRange(uid, startYmd, endYmd){
+  const snap = await userCol(uid)
+    .where('timestamp','>=',dayStart(startYmd))
+    .where('timestamp','<=',dayEnd(endYmd))
+    .orderBy('timestamp').get();
+  const arr = []; snap.forEach(doc => arr.push({ tag: doc.data().tag, timestamp: doc.data().timestamp }));
+  return arr;
+}
+
+/* ===================== AGGREGAZIONE ===================== */
+function buildDayEvents(items, ymd, nextDayFirstTag) {
+  const events = [];
+  if (items.length > 0) {
+    events.push({ tag: items[0].tag, timestamp: dayStart(ymd) });
+    for (const it of items) events.push({ tag: it.tag, timestamp: it.timestamp });
+    const lastTs = items[items.length-1].timestamp;
+    const end = dayEnd(ymd);
+    if (lastTs < end) events.push({ tag: nextDayFirstTag || 'Sleep', timestamp: end });
+    else events.push({ tag: items[items.length-1].tag, timestamp: end });
+  } else {
+    events.push({ tag:'Sleep', timestamp: dayStart(ymd) });
+    events.push({ tag:'Sleep', timestamp: dayEnd(ymd) });
+  }
+  return events;
+}
+
+function minutesPerTagFromEvents(events) {
+  const perTag = {};
+  for (let i=1;i<events.length;i++){
+    const t1 = new Date(events[i-1].timestamp);
+    const t2 = new Date(events[i].timestamp);
+    const diff = Math.round((t2 - t1) / 60000);
+    if (diff <= 0) continue;
+    const tag = events[i].tag;
+    perTag[tag] = (perTag[tag] || 0) + diff;
+  }
+  return perTag;
+}
+
+function splitBuckets(perTag) {
+  const totals = { non:0, good:0, neut:0, wast:0, avail:0, ent:0 };
+  for (const [tag, min] of Object.entries(perTag)) {
+    if (NON_G.includes(tag)) totals.non += min;
+    else if (GOOD.includes(tag)) totals.good += min;
+    else if (NEUT.includes(tag)) { if (tag==='Entertainment') totals.ent += min; else totals.neut += min; }
+    else if (WAST.includes(tag)) totals.wast += min;
+    else totals.neut += min;
+  }
+  totals.avail = Math.max(0, 1440 - totals.non);
+  const allowed = Math.round(totals.avail * TOL / 100);
+  const entNeutral = Math.min(totals.ent, allowed);
+  const entOver    = Math.max(0, totals.ent - allowed);
+  totals.neut += entNeutral;
+  totals.wast += entOver;
+  return totals;
+}
+
+function focusScore(t){ return t.avail ? Math.round(100 * t.good / t.avail) : 0; }
+function percent(n, tot){ return tot>0 ? Math.round(100*n/tot) : 0; }
+
+function rankFromPerTag(perTag){
+  // solo gestibile (esclude NON_G), ordina desc per minuti
+  const rows = Object.entries(perTag).filter(([tag]) => !NON_G.includes(tag));
+  const totalGest = rows.reduce((a,[,m])=>a+m,0);
+  rows.sort((a,b)=>b[1]-a[1]);
+  return { rows, totalGest };
+}
+
+/* ===================== RENDER ===================== */
+let dailyDonut, weekTrend, cmpAChart, cmpBChart;
+
+function setBadge(el, delta){
+  el.textContent = (delta>=0?`+${delta}%`:`${delta}%`);
+  el.className = 'badge ' + (delta>=0? 'up' : 'down');
+}
+
+async function renderDay(uid, ymd){
+  // prendi eventi del giorno + primo tag del giorno dopo per chiudere
+  const items = await fetchDay(uid, ymd);
+  const next = addDaysYMD(ymd, 1);
+  const nextSnap = await userCol(uid).where('timestamp','>=',dayStart(next)).orderBy('timestamp').limit(1).get();
+  let nextFirst = null; nextSnap.forEach(d => nextFirst = d.data().tag);
+
+  const events = buildDayEvents(items, ymd, nextFirst);
+  const perTag = minutesPerTagFromEvents(events);
+  const totals = splitBuckets(perTag);
+
+  // donut
+  if (dailyDonut) dailyDonut.destroy();
+  dailyDonut = new Chart(document.getElementById('dailyDonut').getContext('2d'), {
+    type:'doughnut',
+    data:{ labels:['Bene','Neutro','Spreco'], datasets:[{ data:[totals.good, totals.neut, totals.wast], backgroundColor:['#10b981','#f59e0b','#ef4444'] }] },
+    options:{ responsive:true, maintainAspectRatio:false, cutout:'60%', plugins:{ legend:{ position:'bottom', labels:{ boxWidth:10, font:{ size:11 } } } } }
+  });
+
+  // kpi + barra cumulativa (rispetto a disponibile)
+  const rem = minsUntilEndOfDayFor(ymd);
+  $('#d_remaining').textContent = (rem===null ? '—' : fmtHM(rem));
+  $('#d_avail').textContent     = fmtHM(totals.avail);
+  const focus = focusScore(totals);
+  $('#d_focus').textContent     = `${focus}%`;
+
+  const gP = percent(totals.good, totals.avail);
+  const nP = percent(totals.neut, totals.avail);
+  const wP = percent(totals.wast, totals.avail);
+  $('#d_bar_good').style.width = gP + '%';
+  $('#d_bar_neut').style.width = (gP + nP) + '%';
+  $('#d_bar_wast').style.width = (gP + nP + wP) + '%';
+
+  // classifica
+  const { rows, totalGest } = rankFromPerTag(perTag);
+  const tbody = $('#dailyRank'); tbody.innerHTML = '';
+  rows.forEach(([tag, min])=>{
+    const pct = percent(min, totalGest);
+    tbody.innerHTML += `<tr><td>${tag}</td><td>${min}</td><td>${pct}%</td></tr>`;
+  });
+}
+
+async function renderWeek(uid, endYmd){
+  const start = addDaysYMD(endYmd, -6);
+  // serie focus giornaliero + ranking periodo
+  const byDate = new Map();
+  const snap = await userCol(uid)
+    .where('timestamp','>=',dayStart(start)).where('timestamp','<=',dayEnd(endYmd))
+    .orderBy('timestamp').get();
+  snap.forEach(doc=>{
+    const d = doc.data();
+    const k = String(d.timestamp).slice(0,10);
+    if(!byDate.has(k)) byDate.set(k, []);
+    byDate.get(k).push({ tag:d.tag, timestamp:d.timestamp });
+  });
+
+  const days = []; for (let d=start; d<=endYmd; d=addDaysYMD(d,1)) days.push(d);
+  let focusArr = [], sumWaste=0, sumAvail=0;
+  const perTagAll = {};
+
+  // mappa primo tag del giorno (per riempire il successivo)
+  const firstTagMap = {};
+  for (const d of days) {
+    const arr = (byDate.get(d)||[]).sort((a,b)=> (a.timestamp<b.timestamp?-1:1));
+    firstTagMap[d] = arr.length ? arr[0].tag : null;
+  }
+
+  for (let i=0;i<days.length;i++){
+    const d = days[i];
+    const arr = (byDate.get(d)||[]).sort((a,b)=> (a.timestamp<b.timestamp?-1:1));
+    const nextFirst = firstTagMap[days[i+1]] || 'Sleep';
+    const events = buildDayEvents(arr, d, nextFirst);
+    const perTag = minutesPerTagFromEvents(events);
+    const totals = splitBuckets(perTag);
+    focusArr.push( focusScore(totals) );
+    sumWaste += totals.wast; sumAvail += totals.avail;
+
+    // accumula ranking settimanale (solo gestibile)
+    for (const [tag, min] of Object.entries(perTag)) {
+      if (NON_G.includes(tag)) continue;
+      perTagAll[tag] = (perTagAll[tag]||0) + min;
+    }
+  }
+
+  // trend 7gg
+  if (weekTrend) weekTrend.destroy();
+  weekTrend = new Chart(document.getElementById('weekTrend').getContext('2d'), {
+    type:'line',
+    data:{ labels: focusArr.map((_,i)=>i+1), datasets:[{ data: focusArr, tension:.3, pointRadius:0, borderWidth:2 }] },
+    options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{ y:{ beginAtZero:true, max:100 } } }
+  });
+
+  const avg = Math.round(focusArr.reduce((a,b)=>a+b,0) / (focusArr.length||1));
+  const wastePct = percent(sumWaste, sumAvail);
+  const delta7 = (focusArr.at(-1)||0) - (focusArr[0]||0);
+  $('#w_avg').textContent = `${avg}%`;
+  $('#w_waste').textContent = `${wastePct}%`;
+  setBadge($('#w_delta'), delta7);
+
+  // classifica settimanale
+  const entries = Object.entries(perTagAll);
+  const totalGest = entries.reduce((a,[,m])=>a+m,0);
+  entries.sort((a,b)=>b[1]-a[1]);
+  const tbody = $('#weekRank'); tbody.innerHTML = '';
+  entries.forEach(([tag, min])=>{
+    const pct = percent(min, totalGest);
+    tbody.innerHTML += `<tr><td>${tag}</td><td>${min}</td><td>${pct}%</td></tr>`;
+  });
+}
+
+async function renderCompare(uid){
+  const typeA = $('#pA_type').value, endA = $('#pA_end').value;
+  const typeB = $('#pB_type').value, endB = $('#pB_end').value;
+  if (!endA || !endB) return;
+
+  async function computePeriod(end, type){
+    const start = periodStart(end, type);
+    // prendi tutte le attività; raggruppa per giorno e calcola buckets per coerenza (gestione “riempimento”)
+    const snap = await userCol(uid)
+      .where('timestamp','>=',dayStart(start)).where('timestamp','<=',dayEnd(end))
+      .orderBy('timestamp').get();
+    const byDate = new Map();
+    snap.forEach(doc=>{
+      const d = doc.data();
+      const k = String(d.timestamp).slice(0,10);
+      if(!byDate.has(k)) byDate.set(k, []);
+      byDate.get(k).push({ tag:d.tag, timestamp:d.timestamp });
+    });
+
+    // giorni compresi
+    const days = [];
+    for (let d = start; d <= end; d = addDaysYMD(d,1)) days.push(d);
+
+    // primo tag del giorno
+    const firstTagMap = {};
+    for (const d of days) {
+      const arr = (byDate.get(d)||[]).sort((a,b)=> (a.timestamp<b.timestamp?-1:1));
+      firstTagMap[d] = arr.length ? arr[0].tag : null;
+    }
+
+    let sumAvail=0, sumGood=0, sumNeut=0, sumWast=0;
+    for (let i=0;i<days.length;i++){
+      const d = days[i];
+      const arr = (byDate.get(d)||[]).sort((a,b)=> (a.timestamp<b.timestamp?-1:1));
+      const nextFirst = firstTagMap[days[i+1]] || 'Sleep';
+      const events = buildDayEvents(arr, d, nextFirst);
+      const perTag = minutesPerTagFromEvents(events);
+      const t = splitBuckets(perTag);
+      sumAvail += t.avail; sumGood += t.good; sumNeut += t.neut; sumWast += t.wast;
+    }
+    const focus = sumAvail ? Math.round(100 * sumGood / sumAvail) : 0;
+    return {sumAvail, sumGood, sumNeut, sumWast, focus, label: periodHuman(type) };
+  }
+
+  const [A, B] = await Promise.all([computePeriod(endA, typeA), computePeriod(endB, typeB)]);
+
+  // donut A
+  if (cmpAChart) cmpAChart.destroy();
+  cmpAChart = new Chart(document.getElementById('cmpA').getContext('2d'), {
+    type:'doughnut',
+    data:{ labels:['Bene','Neutro','Spreco'], datasets:[{ data:[A.sumGood, A.sumNeut, A.sumWast], backgroundColor:['#10b981','#f59e0b','#ef4444'] }] },
+    options:{ responsive:true, maintainAspectRatio:false, cutout:'60%', plugins:{legend:{display:false}} }
+  });
+  $('#cmpA_focus').textContent = `${A.focus}%`;
+
+  // donut B
+  if (cmpBChart) cmpBChart.destroy();
+  cmpBChart = new Chart(document.getElementById('cmpB').getContext('2d'), {
+    type:'doughnut',
+    data:{ labels:['Bene','Neutro','Spreco'], datasets:[{ data:[B.sumGood, B.sumNeut, B.sumWast], backgroundColor:['#10b981','#f59e0b','#ef4444'] }] },
+    options:{ responsive:true, maintainAspectRatio:false, cutout:'60%', plugins:{legend:{display:false}} }
+  });
+  $('#cmpB_focus').textContent = `${B.focus}%`;
+  setBadge($('#cmp_delta'), (A.focus - B.focus));
+}
+
+/* ===================== BOOT ===================== */
+let currentUid = null;
+
+document.addEventListener('DOMContentLoaded', () => {
+  // default controls
+  const today = todayLocalYMD();
+  $('#dayPick').value = today;
+
+  const monthEnd = today; // per comodità
+  $('#pA_end').value = monthEnd;
+  $('#pB_end').value = addDaysYMD(monthEnd, -30);
+
+  // auth guard
+  auth.onAuthStateChanged(async u => {
+    if (!u) { window.location.href = 'index.html'; return; }
+    currentUid = u.uid;
+    $('#userLabel').textContent = u.email || u.uid;
+
+    // primo render
+    $('#loading').textContent = 'Caricamento…';
+    await renderDay(currentUid, $('#dayPick').value);
+    await renderWeek(currentUid, $('#dayPick').value);
+    await renderCompare(currentUid);
+    $('#loading').textContent = 'Pronto';
+  });
+
+  // azioni
+  $('#btnReload').addEventListener('click', async ()=>{
+    if (!currentUid) return;
+    $('#loading').textContent = 'Aggiorno…';
+    await renderDay(currentUid, $('#dayPick').value);
+    await renderWeek(currentUid, $('#dayPick').value);
+    $('#loading').textContent = 'Pronto';
+  });
+
+  $('#btnCompare').addEventListener('click', async ()=>{
+    if (!currentUid) return;
+    $('#loading').textContent = 'Confronto…';
+    await renderCompare(currentUid);
+    $('#loading').textContent = 'Pronto';
+  });
+});
+
+// PWA (facoltativo)
+// if ('serviceWorker' in navigator) {
+//   navigator.serviceWorker.register('service-worker.js').catch(()=>{});
+// }
+</script>
+</body>
+</html>
