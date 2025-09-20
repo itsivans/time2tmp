@@ -1,12 +1,16 @@
 <!doctype html>
-<html lang="it">
+<html lang="it" data-theme="light">
 <head>
   <meta charset="utf-8" />
-  <title>Activity Tracker — Accesso</title>
+  <title>Activity Tracker</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <link rel="manifest" href="manifest.json">
   <link rel="icon" href="icon-192.png">
   <meta name="theme-color" content="#2196f3">
+
+  <!-- Tema condiviso -->
+  <link rel="stylesheet" href="theme.css">
+  <script src="theme.js" defer></script>
 
   <!-- Firebase (compat) -->
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
@@ -14,338 +18,333 @@
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 
   <style>
-    :root {
-      --primary:#2196f3;
-      --muted:#666;
-      --border:#ddd;
-    }
-    html, body { height: 100%; }
-    body { font-family: Arial, system-ui, sans-serif; margin: 12px; background:#fff; }
+    *{box-sizing:border-box}
+    body{margin:0; font-family:system-ui, -apple-system, Segoe UI, Roboto, Arial; background:var(--bg); color:var(--text)}
+    header{padding:12px 16px; border-bottom:1px solid var(--line); display:flex; align-items:center; gap:10px; flex-wrap:wrap}
+    header h1{margin:0; font-size:18px; font-weight:800}
+    .right{margin-left:auto; display:flex; gap:8px; align-items:center}
 
-    input, select, button { width: 100%; padding: 12px; margin: 6px 0; font-size: 16px; box-sizing: border-box; }
-    .card { border:1px solid var(--border); border-radius:8px; padding:12px; margin:12px 0; background:#fff; }
-    .row { display:flex; gap:8px; }
-    .row > * { flex:1; }
-    .muted { color:var(--muted); font-size:14px; }
-    .hidden { display:none; }
-    .link { background:var(--primary); color:#fff; border:none; border-radius:6px; margin-top:16px; font-weight:bold; width:100%; }
+    .btn{padding:10px 12px; border:1px solid var(--line); border-radius:10px; background:transparent; color:var(--text); cursor:pointer; font-size:14px}
+    .btn.primary{background:var(--link); border-color:var(--link); color:#fff}
+    a.link-btn{background:var(--link); color:#fff; padding:8px 10px; border-radius:8px; text-decoration:none; font-size:14px}
 
-    /* Chip utente minimale (solo nome + logout emoji) */
-    .statuschip {
-      position: fixed; top: 8px; right: 8px;
-      display: none; align-items: center; gap: 8px;
-      background: rgba(0,0,0,.05); color:#333;
-      padding: 4px 10px; border-radius: 999px;
-      font-size: 12px; line-height: 1; opacity: .6;
-      transition: opacity .2s, transform .2s;
-      z-index: 1000;
-    }
-    .statuschip.show { display: inline-flex; }
-    .statuschip:hover { opacity: 1; }
-    .who { cursor: pointer; user-select: none; }
-    .icon-btn {
-      background: transparent; border: none; padding: 0 2px; margin: 0;
-      font-size: 15px; line-height: 1; cursor: pointer; opacity: .85;
-    }
+    .wrap{padding:14px 16px; display:grid; gap:14px}
+    .card{background:var(--card); border:1px solid var(--line); border-radius:12px; padding:12px}
+    .title{margin:0 0 8px; font-size:16px; font-weight:800}
+    .mini{font-size:12px; color:var(--muted)}
+    .inline{display:flex; align-items:center; gap:8px; flex-wrap:wrap}
 
-    /* Popover nickname (locale) */
-    .nickpop {
-      position: fixed; top: 42px; right: 8px;
-      display: none; width: min(280px, 92vw);
-      background: #fff; border: 1px solid var(--border); border-radius: 10px;
-      box-shadow: 0 10px 30px rgba(0,0,0,.18); padding: 10px;
-      z-index: 1001;
-    }
-    .nickpop.show { display: block; }
-    .nickpop .row { gap: 6px; }
-    .sm { width:auto; padding: 8px 12px; border:none; border-radius:6px; background:#eaeaea; cursor:pointer; }
-    .sm.primary { background: var(--primary); color: #fff; }
-    .sm.ghost { background:#f6f6f6; color:#333; }
+    input, select{width:100%; padding:12px; margin:6px 0; font-size:16px; border:1px solid var(--line); border-radius:10px; background:transparent; color:var(--text)}
+    .row{display:flex; gap:8px; flex-wrap:wrap}
+    .row > *{flex:1 1 200px}
 
-    /* Toast */
-    #toast { position:fixed; left:50%; bottom:24px; transform:translateX(-50%);
-      background:#323232; color:#fff; padding:10px 14px; border-radius:8px;
-      opacity:0; pointer-events:none; transition:opacity .2s, transform .2s; z-index:9999; }
-    #toast.show { opacity:1; transform:translateX(-50%) translateY(-6px); }
+    /* Pill login minimale */
+    .pill{display:inline-flex; align-items:center; gap:8px; padding:6px 10px; border:1px solid var(--line); border-radius:999px; font-size:13px; background:transparent}
+    .logout{cursor:pointer}
 
-    /* === Splash / pre-auth: elimina il flash della login === */
-    .splash {
-      position: fixed; inset: 0;
-      display: flex; align-items: center; justify-content: center;
-      background: #fff; color: #555; font: 14px/1.2 system-ui, Arial;
-      z-index: 2000;
-    }
-    /* In pre-auth nascondo tutto tranne lo splash */
-    .preauth #authBox, .preauth #appBox, .preauth #statuschip { display:none !important; }
-    #splash { display:none; }
-    .preauth #splash { display:flex; }
+    /* Toast centrale */
+    .toast{position:fixed; inset:0; display:none; place-items:center; z-index:9999}
+    .toast.show{display:grid}
+    .toast .box{background:var(--toast); color:var(--toastText); padding:12px 16px; border-radius:12px; box-shadow:0 10px 30px rgba(0,0,0,.25)}
+    .toast .ok{margin-left:8px; border:1px solid rgba(255,255,255,.2); padding:4px 8px; border-radius:8px; cursor:pointer; font-size:12px; background:transparent; color:inherit}
 
-    /* Piccolo miglioramento per preferenze colore scuro di sistema */
-    @media (prefers-color-scheme: dark) {
-      :root { --border:#2c2c2c; --muted:#aaa; }
-      body { background:#121212; color:#eaeaea; }
-      .card { background:#1a1a1a; border-color:#2a2a2a; }
-      .statuschip { background: rgba(255,255,255,.07); color:#ddd; }
-      .nickpop { background:#1a1a1a; border-color:#2a2a2a; }
-      #toast { background:#222; }
-      .splash { background:#121212; color:#bbb; }
-      .link { color:#fff; }
-      input, select, button { background:#141414; color:#eaeaea; border:1px solid #2a2a2a; }
-      .sm { background:#2a2a2a; color:#eaeaea; }
-      .sm.ghost { background:#1f1f1f; color:#eaeaea; }
-    }
+    /* Tabella ultimi 5 */
+    table{width:100%; border-collapse:collapse}
+    th, td{border:1px solid var(--line); padding:6px 8px; font-size:14px; vertical-align:middle}
+    th{text-align:left}
+    .actions{white-space:nowrap}
+    .sm{padding:6px 10px; border:1px solid var(--line); border-radius:8px; background:transparent; color:var(--text); cursor:pointer; font-size:13px}
+    .sm.danger{border-color:#ffb3c1; color:#ff2d55}
+    .sm.primary{background:var(--link); border-color:var(--link); color:#fff}
+
+    /* Pannello tag/categorie */
+    .panel{display:none; padding:10px; border:1px dashed var(--line); border-radius:10px; background:transparent; margin-top:6px}
+    .panel.show{display:block}
+    .maplist{display:flex; gap:6px; flex-wrap:wrap; margin-top:6px}
+    .pill2{border:1px solid var(--line); border-radius:999px; padding:4px 8px; font-size:12px}
+
+    /* Modale edit */
+    .overlay{position:fixed; inset:0; background:rgba(0,0,0,.35); display:none; align-items:center; justify-content:center; z-index:9998}
+    .overlay.show{display:flex}
+    .modal{width:min(520px,92vw); background:var(--bg); border:1px solid var(--line); border-radius:12px; padding:12px}
+    .modal h3{margin:0 0 8px}
+    .btns{display:flex; gap:8px; justify-content:flex-end}
   </style>
 </head>
-<body class="preauth">
-  <noscript>
-    <div class="card" style="margin-top:20px">
-      <strong>⚠️ JavaScript disabilitato.</strong> L'app richiede JavaScript per funzionare.
-    </div>
-  </noscript>
+<body>
+<header>
+  <h1>Activity Tracker</h1>
+  <div class="right">
+    <!-- Toggle tema top-right, gestito da theme.js -->
+    <button id="themeBtn" class="btn" title="Tema">🌙</button>
 
-  <!-- Splash durante l'inizializzazione Auth (evita flash di login) -->
-  <div id="splash" class="splash" aria-live="polite">Avvio…</div>
+    <!-- Pill di login minimale -->
+    <span id="userPill" class="pill" style="display:none">
+      <span id="userLabel">—</span>
+      <span id="logoutBtn" class="logout" title="Logout">🚪</span>
+    </span>
 
-  <!-- LOGIN (inizialmente nascosto per evitare flash) -->
-  <div id="authBox" class="card hidden">
-    <h3>🔐 Accedi</h3>
+    <a class="link-btn" href="statistics.html">📊 Statistiche</a>
+  </div>
+</header>
+
+<div class="wrap">
+  <!-- Box autenticazione -->
+  <div id="authBox" class="card">
+    <div class="title">Accedi</div>
     <div class="row">
       <input id="email" type="email" placeholder="Email" autocomplete="email">
       <input id="pass" type="password" placeholder="Password" autocomplete="current-password">
     </div>
     <div class="row">
-      <button id="loginBtn">Accedi</button>
-      <button id="signupBtn">Registrati</button>
+      <button id="loginBtn" class="btn">Accedi</button>
+      <button id="signupBtn" class="btn">Registrati</button>
     </div>
-    <p class="muted">Devi essere loggato per inserire attività e vedere le statistiche.</p>
+    <div class="mini">Devi essere loggato per inserire attività.</div>
   </div>
 
-  <!-- CHIP UTENTE MINIMALE (solo nome + emoji logout) -->
-  <div id="statuschip" class="statuschip" aria-live="polite">
-    <span id="who" class="who" title="Clicca per impostare un nickname (solo su questo dispositivo)"></span>
-    <button id="logoutBtn" class="icon-btn" title="Logout" aria-label="Logout">🚪</button>
-  </div>
+  <!-- App -->
+  <div id="appBox" class="card" style="display:none">
+    <div class="inline" style="justify-content:space-between">
+      <div class="inline">
+        <div class="title" style="margin:0">📥 Inserisci</div>
+        <span id="gearOpen" class="gear" title="Gestisci tag e categorie">⚙︎</span>
+      </div>
+      <div class="mini">Ultima attività: <b id="lastActivity">—</b></div>
+    </div>
 
-  <!-- Popover nickname -->
-  <div id="nickPop" class="nickpop" role="dialog" aria-modal="true" aria-labelledby="nickTitle">
-    <div id="nickTitle" class="muted" style="margin-bottom:6px;">Nickname locale (non salvato nel cloud)</div>
+    <input type="text" id="activity" placeholder="Attività…">
     <div class="row">
-      <input id="nickInput" type="text" placeholder="Il tuo nickname (solo qui)">
-      <button id="saveNickBtn" class="sm primary">Salva</button>
-      <button id="clearNickBtn" class="sm ghost">Rimuovi</button>
-      <button id="cancelNickBtn" class="sm">Chiudi</button>
-    </div>
-  </div>
-
-  <!-- APP (quando loggato) -->
-  <div id="appBox" class="hidden">
-    <div class="card" style="margin-top: 28px;">
-      <h3>📥 Inserisci attività</h3>
-      <input type="text" id="activity" placeholder="Attività...">
       <input type="datetime-local" id="dateTime">
-      <select id="tag">
-        <option value="">--Tag--</option>
-        <option>Entertainment</option>
-        <option>Survive</option>
-        <option>Study</option>
-        <option>Work</option>
-        <option>Nut</option>
-        <option>Slavery</option>
-        <option>Productivity</option>
-        <option>Waste</option>
-        <option>Chess</option>
-        <option>Gym</option>
-        <option>Bike</option>
-        <option>Holiday</option>
-        <option>Chinese</option>
-        <option>Sleep</option>
-        <option>Book</option>
-      </select>
-      <button id="addBtn">➕ Aggiungi</button>
-      <div id="msg" class="muted"></div>
+      <select id="tag"></select>
     </div>
-
-    <a href="statistics.html"><button class="link">📊 Vai alle statistiche</button></a>
+    <button id="addBtn" class="btn primary">➕ Aggiungi</button>
   </div>
 
-  <!-- Toast -->
-  <div id="toast"></div>
+  <!-- Pannello gestione tag/categorie -->
+  <div id="gearPanel" class="panel" aria-hidden="true">
+    <div class="row">
+      <input id="newTagName" placeholder="Nuovo tag (es. Nut)">
+      <select id="newTagCat">
+        <option value="good">Produttivo</option>
+        <option value="neutral">Neutro</option>
+        <option value="bad">Spreco</option>
+        <option value="non">Non gestibile</option>
+      </select>
+      <button id="addTagBtn" class="btn primary">Aggiungi/aggiorna</button>
+      <button id="resetMapBtn" class="btn" style="border-color:#ffb3c1; color:#ff2d55">Reset mappature</button>
+    </div>
+    <div class="mini">Tag disponibili (menu a tendina) + mappature locali (usate nelle statistiche):</div>
+    <div class="maplist" id="tagListBox"></div>
+  </div>
 
-  <script>
-    // === Firebase init ===
-    const firebaseConfig = {
-      apiKey: "AIzaSyDEq8aUhdBPcjYM6H6909DldXAdjhRNWbI",
-      authDomain: "time-ff7ed.firebaseapp.com",
-      projectId: "time-ff7ed",
-      storageBucket: "time-ff7ed.appspot.com",
-      messagingSenderId: "842285944784",
-      appId: "1:842285944784:web:de483548153abc956033d5",
-      measurementId: "G-ZR0BNWGVXJ"
-    };
-    if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+  <!-- Ultimi 5 -->
+  <div id="listBox" class="card" style="display:none">
+    <div class="title">Ultimi 5</div>
+    <table>
+      <thead><tr><th>Data</th><th>Ora</th><th>Tag</th><th>Attività</th><th class="actions">Azioni</th></tr></thead>
+      <tbody id="activityList"></tbody>
+    </table>
+  </div>
+</div>
 
-    // Offline persistence
-    firebase.firestore().enablePersistence({synchronizeTabs:true}).catch(e=>{
-      console.warn('Persistence non attiva:', e.code);
+<!-- Toast -->
+<div class="toast" id="toast">
+  <div class="box">
+    <span id="toastMsg">Salvato</span>
+    <button class="ok" onclick="document.getElementById('toast').classList.remove('show')">OK</button>
+  </div>
+</div>
+
+<!-- Modale edit -->
+<div id="editOverlay" class="overlay" aria-hidden="true">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="editTitle">
+    <h3 id="editTitle">✏️ Modifica</h3>
+    <input type="text" id="editActivity" placeholder="Attività…">
+    <div class="row">
+      <input type="datetime-local" id="editDateTime">
+      <select id="editTag"></select>
+    </div>
+    <div class="btns">
+      <button id="cancelEditBtn" class="btn">Annulla</button>
+      <button id="deleteEditBtn" class="btn" style="border-color:#ffb3c1; color:#ff2d55">Elimina</button>
+      <button id="saveEditBtn" class="btn primary">Salva</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ================= Firebase ================= */
+const firebaseConfig = {
+  apiKey: "AIzaSyDEq8aUhdBPcjYM6H6909DldXAdjhRNWbI",
+  authDomain: "time-ff7ed.firebaseapp.com",
+  projectId: "time-ff7ed",
+  storageBucket: "time-ff7ed.appspot.com",
+  messagingSenderId: "842285944784",
+  appId: "1:842285944784:web:de483548153abc956033d5",
+  measurementId: "G-ZR0BNWGVXJ"
+};
+if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const db   = firebase.firestore();
+
+/* ================= Tag + categorie (local) ================= */
+const TAGS_KEY='tt_custom_tags';
+const MAP_KEY ='tt_custom_tag_map';
+const DEFAULT_TAGS = ["Entertainment","Survive","Study","Work","Nut","Slavery","Productivity","Waste","Chess","Gym","Bike","Holiday","Chinese","Sleep","Book"];
+let NON_G=['Sleep','Work','Survive','Slavery'], GOOD=['Study','Productivity','Book','Chinese','Gym','Bike','Chess'], NEUT=['Entertainment','Holiday','Nut'], WAST=['Waste'];
+const loadJSON=(k,f)=>{ try{return JSON.parse(localStorage.getItem(k)||JSON.stringify(f));}catch{return f;} };
+const saveJSON=(k,v)=>localStorage.setItem(k,JSON.stringify(v));
+let customTags = loadJSON(TAGS_KEY, DEFAULT_TAGS);
+let tagMap     = loadJSON(MAP_KEY, {});
+function tagCategory(tag){ const t=String(tag||'').trim(); if(tagMap[t]) return tagMap[t]; if(NON_G.includes(t)) return 'non'; if(GOOD.includes(t)) return 'good'; if(WAST.includes(t)) return 'bad'; if(NEUT.includes(t)) return 'neutral'; return 'neutral'; }
+
+/* ================= Helpers ================= */
+const $ = s=>document.querySelector(s);
+function toast(msg){ $('#toastMsg').textContent=msg; $('#toast').classList.add('show'); setTimeout(()=>$('#toast').classList.remove('show'), 1800); }
+function getLocalISODateTimeNow(){ const now=new Date(); now.setSeconds(0,0); const tz=-now.getTimezoneOffset(); return new Date(now.getTime()+tz*60000).toISOString().slice(0,16); }
+function userCol(uid){ return db.collection(`users/${uid}/activities`); }
+function buildTagSelects(){ const sel=$('#tag'); sel.innerHTML=''; const sel2=$('#editTag'); sel2.innerHTML=''; customTags.forEach(t=>{ const o=document.createElement('option'); o.value=t; o.textContent=t; sel.appendChild(o.cloneNode(true)); sel2.appendChild(o); }); }
+function renderTagListBox(){ const box=$('#tagListBox'); box.innerHTML=''; customTags.forEach(t=>{ const cat=tagCategory(t); const color=cat==='good'?'var(--good)':cat==='bad'?'var(--bad)':cat==='non'?'#8b5cf6':'var(--neutral)'; const el=document.createElement('span'); el.className='pill2'; el.style.borderColor=color; el.style.color=color; el.textContent=`${t} → ${cat}`; box.appendChild(el); }); }
+
+/* ================= Stato ================= */
+let currentUid=null, unsubLatest=null, currentEditId=null;
+
+/* ================= Auth UI ================= */
+function setLoggedUI(user){
+  if (user){
+    $('#authBox').style.display='none';
+    $('#appBox').style.display='';
+    $('#listBox').style.display='';
+    $('#userPill').style.display='inline-flex';
+    $('#userLabel').textContent=user.email||user.uid;
+    if (!$('#dateTime').value) $('#dateTime').value=getLocalISODateTimeNow();
+  } else {
+    $('#authBox').style.display='';
+    $('#appBox').style.display='none';
+    $('#listBox').style.display='none';
+    $('#userPill').style.display='none';
+  }
+}
+auth.onAuthStateChanged(u=>{
+  if (!u){ setLoggedUI(null); return; }
+  currentUid=u.uid; setLoggedUI(u); buildTagSelects(); renderTagListBox(); watchLastActivity(); watchLatest5();
+});
+$('#loginBtn').onclick=async()=>{ const email=$('#email').value.trim(), pass=$('#pass').value; if(!email||!pass) return toast('Inserisci email e password'); try{ await auth.signInWithEmailAndPassword(email,pass); toast('Benvenuto!'); }catch(e){ console.error(e); toast(e.message); } };
+$('#signupBtn').onclick=async()=>{ const email=$('#email').value.trim(), pass=$('#pass').value; if(!email||!pass) return toast('Inserisci email e password'); try{ await auth.createUserWithEmailAndPassword(email,pass); await auth.currentUser.sendEmailVerification(); toast('Registrazione ok. Verifica email.'); }catch(e){ console.error(e); toast(e.message); } };
+$('#logoutBtn').onclick=async()=>{ if(!confirm('Sei sicuro di voler uscire?')) return; await auth.signOut(); };
+
+/* ================= Inserimento ================= */
+$('#activity').addEventListener('keydown', e=>{ if(e.key==='Enter') $('#addBtn').click(); });
+$('#activity').addEventListener('focus', ()=>{ if(!$('#dateTime').value) $('#dateTime').value=getLocalISODateTimeNow(); });
+$('#dateTime').addEventListener('focus', function(){ if(!this.value) this.value=getLocalISODateTimeNow(); });
+$('#addBtn').onclick=async()=>{
+  const u=auth.currentUser; if(!u) return toast('Devi essere loggato');
+  const activity=$('#activity').value.trim(); const tag=$('#tag').value;
+  let dateTime=$('#dateTime').value||getLocalISODateTimeNow();
+  if(!activity||!tag) return toast('Inserisci attività e tag');
+  try{
+    await userCol(u.uid).add({ activity, tag, timestamp: dateTime });
+    $('#activity').value=''; $('#dateTime').value='';
+    toast('Attività salvata');
+  }catch(e){ console.error(e); toast('Errore: '+e.message); }
+};
+
+/* ================= Ultima attività ================= */
+function watchLastActivity(){
+  if(!currentUid) return;
+  userCol(currentUid).orderBy('timestamp','desc').limit(1).onSnapshot(snap=>{
+    let txt='—';
+    snap.forEach(d=>{
+      const t=new Date(d.data().timestamp);
+      const dd=t.toLocaleDateString('it-IT',{ timeZone:'Europe/Rome' });
+      const hh=t.toLocaleTimeString('it-IT',{ timeZone:'Europe/Rome', hour12:false });
+      txt=`${dd} ${hh}`;
     });
+    $('#lastActivity').textContent=txt;
+  });
+}
 
-    const auth = firebase.auth();
-    const db   = firebase.firestore();
-
-    // === Helpers UI ===
-    const $ = s => document.querySelector(s);
-    const authBox   = $('#authBox');
-    const appBox    = $('#appBox');
-    const statuschip= $('#statuschip');
-    const whoEl     = $('#who');
-    const msg       = $('#msg');
-    const toastEl   = $('#toast');
-    const nickPop   = $('#nickPop');
-    const nickInput = $('#nickInput');
-
-    const NICK_KEY = 'timeNickname';
-
-    function setMsg(t){ msg.textContent = t || ''; }
-    function showToast(text){
-      toastEl.textContent = text;
-      toastEl.classList.add('show');
-      setTimeout(()=>toastEl.classList.remove('show'), 1600);
-    }
-    function getLocalISODateTimeNow(){
-      const now = new Date();
-      now.setSeconds(0,0);
-      const tzOffset = -now.getTimezoneOffset();
-      return new Date(now.getTime() + tzOffset * 60000).toISOString().slice(0,16);
-    }
-    function loadNick(){ try { return localStorage.getItem(NICK_KEY) || ''; } catch { return ''; } }
-    function saveNick(v){ try { localStorage.setItem(NICK_KEY, v||''); } catch {} }
-    function clearNick(){ try { localStorage.removeItem(NICK_KEY); } catch {} }
-    function nameFromEmail(email){ return (email || '').split('@')[0]; }
-    function updateWho(user){
-      const nick = loadNick().trim();
-      whoEl.textContent = nick || nameFromEmail(user.email) || 'utente';
-    }
-    function toggleNickPop(show){
-      if (show) {
-        const user = auth.currentUser;
-        const current = (loadNick().trim()) || (user ? nameFromEmail(user.email) : '');
-        nickInput.value = current;
-        nickPop.classList.add('show');
-      } else {
-        nickPop.classList.remove('show');
-      }
-    }
-
-    // === Auth state ===
-    let firstAuthEventHandled = false;
-    auth.onAuthStateChanged(user => {
-      if (user) {
-        authBox.classList.add('hidden');
-        appBox.classList.remove('hidden');
-        statuschip.classList.add('show');
-        updateWho(user);
-
-        const dt = $('#dateTime');
-        if (!dt.value) dt.value = getLocalISODateTimeNow();
-
-        const act = $('#activity');
-        act.onkeydown = (e) => { if (e.key === 'Enter') $('#addBtn').click(); };
-        act.onfocus   = () => { if (!dt.value) dt.value = getLocalISODateTimeNow(); };
-
-      } else {
-        appBox.classList.add('hidden');
-        authBox.classList.remove('hidden');
-        statuschip.classList.remove('show');
-        toggleNickPop(false);
-      }
-
-      // Rimuovo lo splash e lo stato "preauth" al PRIMO evento
-      if (!firstAuthEventHandled) {
-        document.body.classList.remove('preauth');
-        firstAuthEventHandled = true;
-      }
+/* ================= Ultimi 5 (realtime) ================= */
+function watchLatest5(){
+  if (unsubLatest) { unsubLatest(); unsubLatest=null; }
+  unsubLatest = userCol(currentUid).orderBy('timestamp','desc').limit(5).onSnapshot(snap=>{
+    const tbody=$('#activityList'); tbody.innerHTML='';
+    snap.forEach(doc=>{
+      const d=doc.data(); const t=new Date(d.timestamp);
+      const localDate=t.toLocaleDateString('it-IT',{ timeZone:'Europe/Rome' });
+      const localTime=t.toLocaleTimeString('it-IT',{ timeZone:'Europe/Rome', hour12:false });
+      const tr=document.createElement('tr');
+      tr.innerHTML=`<td>${localDate}</td><td>${localTime}</td><td>${d.tag||''}</td><td>${d.activity||''}</td>
+      <td class="actions"><button class="sm" onclick="openEdit('${doc.id}')">✏️</button>
+      <button class="sm danger" onclick="deleteActivity('${doc.id}')">🗑️</button></td>`;
+      tbody.appendChild(tr);
     });
+  });
+}
 
-    // === Auth actions ===
-    $('#loginBtn').onclick = async () => {
-      const email = $('#email').value.trim();
-      const pass  = $('#pass').value;
-      if (!email || !pass) return setMsg('Inserisci email e password.');
-      try { await auth.signInWithEmailAndPassword(email, pass); setMsg('Accesso eseguito.'); }
-      catch(e){ console.error(e); setMsg(mapAuthError(e.code, e.message)); }
-    };
-    $('#signupBtn').onclick = async () => {
-      const email = $('#email').value.trim();
-      const pass  = $('#pass').value;
-      if (!email || !pass) return setMsg('Inserisci email e password.');
-      try { await auth.createUserWithEmailAndPassword(email, pass); await auth.currentUser.sendEmailVerification(); setMsg('Registrazione ok. Verifica la tua email.'); }
-      catch(e){ console.error(e); setMsg(mapAuthError(e.code, e.message)); }
-    };
-    $('#logoutBtn').onclick = () => auth.signOut();
+/* ================= Modifica / Cancella ================= */
+function toInputDT(str){ return (str||'').slice(0,16); }
+async function openEdit(id){
+  currentEditId=id; const u=auth.currentUser; if(!u) return;
+  const snap=await userCol(u.uid).doc(id).get();
+  if (!snap.exists) return toast('Documento non trovato');
+  const d=snap.data();
+  $('#editActivity').value=d.activity||'';
+  $('#editDateTime').value=toInputDT(d.timestamp||'');
+  buildTagSelects(); $('#editTag').value=d.tag||'';
+  $('#editOverlay').classList.add('show'); $('#editOverlay').setAttribute('aria-hidden','false');
+}
+function closeEdit(){ currentEditId=null; $('#editOverlay').classList.remove('show'); $('#editOverlay').setAttribute('aria-hidden','true'); }
+$('#cancelEditBtn').onclick=closeEdit;
 
-    function mapAuthError(code, fallback){
-      const map = {
-        'auth/invalid-email': 'Email non valida.',
-        'auth/user-not-found': 'Utente non trovato.',
-        'auth/wrong-password': 'Password errata.',
-        'auth/email-already-in-use': 'Email già in uso.',
-        'auth/too-many-requests': 'Troppe richieste, riprova più tardi.'
-      };
-      return map[code] || fallback || 'Errore.';
-    }
+$('#saveEditBtn').onclick=async()=>{
+  const u=auth.currentUser; if(!u||!currentEditId) return;
+  const activity=$('#editActivity').value.trim();
+  const timestamp=$('#editDateTime').value;
+  const tag=$('#editTag').value;
+  if(!activity||!timestamp||!tag) return toast('Compila tutti i campi');
+  try{
+    await userCol(u.uid).doc(currentEditId).update({ activity, timestamp, tag });
+    closeEdit(); toast('Salvato');
+  }catch(e){ console.error(e); toast('Errore: '+e.message); }
+};
+$('#deleteEditBtn').onclick=async()=>{
+  const u=auth.currentUser; if(!u||!currentEditId) return;
+  if(!confirm('Eliminare definitivamente questa attività?')) return;
+  try{
+    await userCol(u.uid).doc(currentEditId).delete();
+    closeEdit(); toast('Eliminato');
+  }catch(e){ console.error(e); toast('Errore: '+e.message); }
+};
 
-    // === Nickname (solo locale) ===
-    whoEl.onclick = () => toggleNickPop(true);
-    $('#cancelNickBtn').onclick = () => toggleNickPop(false);
-    $('#saveNickBtn').onclick = () => {
-      saveNick(nickInput.value.trim());
-      toggleNickPop(false);
-      if (auth.currentUser) updateWho(auth.currentUser);
-      showToast('✅ Nickname aggiornato');
-    };
-    $('#clearNickBtn').onclick = () => {
-      clearNick();
-      toggleNickPop(false);
-      if (auth.currentUser) updateWho(auth.currentUser);
-      showToast('ℹ️ Nickname rimosso');
-    };
+/* ================= Pannello tag/categorie ================= */
+$('#gearOpen').onclick=()=>{
+  const p=$('#gearPanel'); const open=!p.classList.contains('show');
+  p.classList.toggle('show', open);
+  p.setAttribute('aria-hidden', open?'false':'true');
+  buildTagSelects(); renderTagListBox();
+};
+$('#addTagBtn').onclick=()=>{
+  const name=String($('#newTagName').value||'').trim();
+  const cat=$('#newTagCat').value;
+  if(!name) return toast('Inserisci un nome tag');
+  if(!customTags.includes(name)){ customTags.push(name); customTags.sort(); saveJSON(TAGS_KEY, customTags); }
+  tagMap[name]=cat; saveJSON(MAP_KEY, tagMap);
+  buildTagSelects(); renderTagListBox();
+  toast(`Tag "${name}" aggiunto (${cat})`);
+  $('#newTagName').value='';
+};
+$('#resetMapBtn').onclick=()=>{
+  if(!confirm('Cancellare tutte le mappature personalizzate?')) return;
+  tagMap={}; saveJSON(MAP_KEY, tagMap);
+  renderTagListBox(); toast('Mappature resettate');
+};
 
-    // Chiudi popover cliccando fuori
-    document.addEventListener('click', (e)=>{
-      if (!nickPop.classList.contains('show')) return;
-      const withinPop = nickPop.contains(e.target);
-      const clickedWho = whoEl.contains(e.target);
-      if (!withinPop && !clickedWho) toggleNickPop(false);
-    });
-
-    // === Add activity ===
-    $('#addBtn').onclick = async () => {
-      const user = auth.currentUser;
-      if (!user) return setMsg('Devi essere loggato.');
-
-      const activity = $('#activity').value.trim();
-      const tag      = $('#tag').value;
-      let   dateTime = $('#dateTime').value;
-
-      if (!activity || !tag) return setMsg('Inserisci attività e tag!');
-      if (!dateTime) dateTime = getLocalISODateTimeNow();
-
-      try {
-        await db.collection(`users/${user.uid}/activities`).add({ activity, tag, timestamp: dateTime });
-        $('#activity').value = ''; $('#dateTime').value = ''; $('#tag').value = '';
-        setMsg('Attività salvata.'); showToast('✅ Attività inserita');
-      } catch (e) {
-        console.error(e);
-        setMsg('Errore nel salvataggio: ' + e.message);
-      }
-    };
-
-    // === Service Worker ===
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('service-worker.js')
-        .then(()=>console.log('✅ Service Worker registrato'))
-        .catch(err=>console.warn('❌ SW errore:', err));
-    }
-  </script>
+/* ================= Service Worker (facoltativo) ================= */
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('service-worker.js').catch(()=>{});
+}
+</script>
 </body>
 </html>
