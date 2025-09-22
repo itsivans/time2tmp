@@ -17,10 +17,11 @@
   :root{
     /* Light */
     --bg:#ffffff; --text:#0b1320; --muted:#6b7280; --line:#e5e7eb; --card:#f8fafc;
-    --good:#06c167; --neutral:#6b7280; --bad:#ff2d55; /* più accesi */
+    --good:#06c167; --neutral:#6b7280; --bad:#ff2d55;
     --good-bg:#e9fff4; --neutral-bg:#f3f4f6; --bad-bg:#ffe9ee;
     --link:#1e88e5;
     --chip:#eef2f7; --chipText:#334155;
+    --warn:#8b5cf6;
   }
   [data-theme="dark"]{
     --bg:#0b1118; --text:#e6edf3; --muted:#94a3b8; --line:#1f2937; --card:#0f1620;
@@ -28,6 +29,7 @@
     --good-bg:#0d2a1e; --neutral-bg:#141a23; --bad-bg:#2a0f15;
     --link:#62a8ff;
     --chip:#151c27; --chipText:#cdd6e1;
+    --warn:#a78bfa;
   }
 
   *{box-sizing:border-box}
@@ -82,6 +84,10 @@
   .panel button{background:var(--text); color:var(--bg); cursor:pointer; border-color:var(--text)}
   .maplist{margin-top:6px; display:flex; gap:6px; flex-wrap:wrap}
   .pill{border:1px solid var(--line); border-radius:999px; padding:4px 8px; font-size:12px}
+  .cloudTitle{ margin-top:10px; font-size:12px; color:var(--muted) }
+  .cloud{ display:flex; gap:6px; flex-wrap:wrap; margin-top:6px }
+  .cloud .pill{ cursor:pointer; }
+  .pill.warn{ border-color: var(--warn); color: var(--warn); }
 
   /* ====== Pannello RECORD (a tendina) ====== */
   details.rec{ border:1px solid var(--line); border-radius:12px; padding:10px; background:var(--card) }
@@ -92,13 +98,15 @@
   .recList{ margin-top:8px; display:grid; gap:8px }
   .recItem{ border:1px solid var(--line); border-radius:12px; padding:8px; display:grid; grid-template-columns:1fr; gap:6px; background:transparent }
   .recRow{ display:grid; grid-template-columns: 1fr 120px; gap:6px }
-  .recRow3{ display:grid; grid-template-columns: 1fr 1fr; gap:6px }
+  .recRow3{ display:grid; grid-template-columns: 1fr auto; gap:6px; align-items:center }
   .recAct{ display:flex; gap:6px; justify-content:flex-end }
-  .recAct button{ padding:8px 10px; border:1px solid var(--line); border-radius:8px; background:transparent; color:var(--text); cursor:pointer }
-  .recAct .save{ background:var(--good); color:#fff; border-color:var(--good) }
-  .recAct .del{ background:var(--bad); color:#fff; border-color:var(--bad) }
+  .iconBtn{ padding:8px 10px; border:1px solid var(--line); border-radius:8px; background:transparent; color:var(--text); cursor:pointer; min-width:auto }
+  .iconBtn.save{ background:var(--good); color:#fff; border-color:var(--good) }
+  .iconBtn.del{ background:var(--bad); color:#fff; border-color:var(--bad) }
   .recEmpty{ text-align:center; color:var(--muted); font-size:13px; padding:10px }
   .recCount{ font-size:12px; color:var(--muted) }
+  .recFoot{ display:flex; justify-content:center; margin-top:6px }
+  .loadMore{ border:1px solid var(--line); background:transparent; color:var(--text); border-radius:8px; padding:8px 12px; cursor:pointer }
 
   @media(min-width:720px){
     .row{ display:grid; grid-template-columns: 1fr 1fr; gap:12px }
@@ -139,6 +147,8 @@
         <button id="resetMap" style="background:#ff2d55">Reset</button>
       </div>
       <div class="maplist" id="mapList"></div>
+      <div class="cloudTitle">Tag rilevati (ultimi 500 + default): clicca per precompilare</div>
+      <div class="cloud" id="tagCloud"></div>
     </div>
   </div>
 
@@ -216,6 +226,7 @@
     <div id="recList" class="recList">
       <div class="recEmpty">Nessun record nel periodo selezionato.</div>
     </div>
+    <div class="recFoot"><button id="loadMore" class="loadMore">Carica altri</button></div>
   </details>
 </div>
 
@@ -238,8 +249,7 @@ const db = firebase.firestore();
 const THEME_KEY = 'tt_theme';
 function applyTheme(t){ document.documentElement.setAttribute('data-theme', t); localStorage.setItem(THEME_KEY, t); document.getElementById('themeBtn').textContent = (t==='dark'?'☀️':'🌙'); }
 (function initTheme(){ applyTheme(localStorage.getItem(THEME_KEY)||'light'); })();
-const themeBtnEl = document.getElementById('themeBtn');
-themeBtnEl.addEventListener('click', ()=>{
+document.getElementById('themeBtn').addEventListener('click', ()=>{
   const cur = document.documentElement.getAttribute('data-theme');
   applyTheme(cur==='dark'?'light':'dark');
 });
@@ -249,6 +259,11 @@ let NON_G = ['Sleep','Work','Survive','Slavery'];
 let GOOD  = ['Study','Productivity','Book','Chinese','Gym','Bike','Chess'];
 let NEUT  = ['Entertainment','Holiday','Nut'];
 let WAST  = ['Waste'];
+
+const DEFAULT_TAGS = [
+  "Entertainment","Survive","Study","Work","Nut","Slavery","Productivity","Waste",
+  "Chess","Gym","Bike","Holiday","Chinese","Sleep","Book"
+];
 
 const LS_KEY = 'tt_custom_tag_map';
 function loadCustomMap(){ try{ return JSON.parse(localStorage.getItem(LS_KEY)||'{}'); }catch{ return {}; } }
@@ -484,63 +499,143 @@ async function renderAll(){
   const ymd = $('#dayPick').value;
   $('#loading').textContent = 'Caricamento…';
   await renderDay(currentUid, ymd);
-  await renderPeriod(currentUid); // usa i controlli del blocco “Periodo”
+  await renderPeriod(currentUid);
   $('#loading').textContent = 'Pronto';
 }
 
-/* ===== RECORDS panel ===== */
-function toLocalDTValue(iso){
-  if(!iso) return '';
-  // expect ISO like 2025-09-22T12:34 or 2025-09-22T12:34:56
-  return iso.slice(0,16);
-}
-function fromLocalDTValue(v){
-  // datetime-local back to ISO without seconds
-  return v; // già in formato YYYY-MM-DDTHH:MM
-}
+/* ===== TAG CLOUD (auto) ===== */
+async function buildTagCloud(uid){
+  const cloudEl = $('#tagCloud');
+  cloudEl.innerHTML = `<span class="pill muted">Scansione…</span>`;
+  const seen = new Set(DEFAULT_TAGS);
 
-async function fetchRecords(uid, startYmd, endYmd){
-  const snap = await col(uid)
-    .where('timestamp','>=', dayStart(startYmd))
-    .where('timestamp','<=', dayEnd(endYmd))
-    .orderBy('timestamp','desc')
-    .limit(200)
-    .get();
-  const arr=[]; snap.forEach(doc=>{ const d=doc.data(); arr.push({id:doc.id, activity:d.activity||'', tag:d.tag||'', timestamp:d.timestamp||''}); });
-  return arr;
-}
+  try{
+    const snap = await col(uid).orderBy('timestamp','desc').limit(500).get();
+    snap.forEach(doc=>{
+      const t = (doc.data().tag||'').trim();
+      if (t) seen.add(t);
+    });
+  }catch(e){
+    console.warn('Tag cloud read error', e.message);
+  }
 
-async function renderRecords(){
-  const start = $('#recStart').value || todayYMD();
-  const end   = $('#recEnd').value   || $('#recStart').value || todayYMD();
-  const q     = ($('#recSearch').value||'').toLowerCase();
-  const list  = $('#recList'); list.innerHTML = '<div class="recEmpty">Caricamento…</div>';
-  const data  = await fetchRecords(currentUid, start, end);
-  const filtered = data.filter(r=> !q || r.activity.toLowerCase().includes(q) || r.tag.toLowerCase().includes(q));
-  $('#recCount').textContent = `(${filtered.length})`;
-  if(!filtered.length){ list.innerHTML = '<div class="recEmpty">Nessun record trovato.</div>'; return; }
-  list.innerHTML='';
-  filtered.forEach(rec=>{
-    const item = document.createElement('div'); item.className='recItem'; item.dataset.id=rec.id;
-    item.innerHTML = `
-      <div class="recRow">
-        <input class="rAct" placeholder="Attività" value="${rec.activity.replaceAll('<','&lt;')}">
-        <input class="rTag" placeholder="Tag" value="${rec.tag.replaceAll('<','&lt;')}">
-      </div>
-      <div class="recRow3">
-        <input class="rTime" type="datetime-local" value="${toLocalDTValue(rec.timestamp)}">
-        <div class="recAct">
-          <button class="save">Salva</button>
-          <button class="del">Elimina</button>
-        </div>
-      </div>`;
-    list.appendChild(item);
+  const tags = Array.from(seen).sort((a,b)=>a.localeCompare(b));
+  cloudEl.innerHTML = '';
+  if (!tags.length){
+    cloudEl.innerHTML = `<span class="pill muted">Nessun tag trovato</span>`;
+    return;
+  }
+  tags.forEach(tag=>{
+    const pill = document.createElement('span');
+    const mapped = customMap[tag];
+    pill.className = 'pill' + (mapped ? '' : ' warn');
+    pill.textContent = tag + (mapped ? ` → ${mapped}` : '');
+    pill.title = mapped ? `Già mappato come ${mapped}` : 'Clicca per impostare la mappatura';
+    pill.addEventListener('click', ()=>{
+      $('#tagName').value = tag;
+      $('#tagCat').focus();
+    });
+    cloudEl.appendChild(pill);
   });
 }
 
+/* ===== RECORDS panel: paging + UX ✏️🗑️ ===== */
+function toLocalDTValue(iso){ if(!iso) return ''; return iso.slice(0,16); }
+function fromLocalDTValue(v){ return v; }
+
+let recPageSizeFirst = 5;
+let recPageSizeNext  = 10;
+let recLastDoc = null;
+let recHasMore = true;
+let recQueryRange = {start: null, end: null};
+
+async function fetchRecordsPage(uid, startYmd, endYmd, afterDoc){
+  let q = col(uid)
+    .where('timestamp','>=', dayStart(startYmd))
+    .where('timestamp','<=', dayEnd(endYmd))
+    .orderBy('timestamp','desc')
+    .limit(afterDoc ? recPageSizeNext : recPageSizeFirst);
+  if (afterDoc) q = q.startAfter(afterDoc);
+  const snap = await q.get();
+  const out = [];
+  snap.forEach(doc=>{
+    const d = doc.data();
+    out.push({id:doc.id, activity:d.activity||'', tag:d.tag||'', timestamp:d.timestamp||''});
+  });
+  const last = snap.docs[snap.docs.length-1] || null;
+  return {rows: out, lastDoc: last, empty: snap.empty, size: snap.size};
+}
+
+function recItemHTML(rec){
+  const safeAct = (rec.activity||'').replaceAll('<','&lt;');
+  const safeTag = (rec.tag||'').replaceAll('<','&lt;');
+  return `
+    <div class="recItem" data-id="${rec.id}">
+      <div class="recRow">
+        <input class="rAct" placeholder="Attività" value="${safeAct}" disabled>
+        <input class="rTag" placeholder="Tag" value="${safeTag}" disabled>
+      </div>
+      <div class="recRow3">
+        <input class="rTime" type="datetime-local" value="${toLocalDTValue(rec.timestamp)}" disabled>
+        <div class="recAct">
+          <button class="iconBtn edit" title="Modifica">✏️</button>
+          <button class="iconBtn del" title="Elimina">🗑️</button>
+        </div>
+      </div>
+    </div>`;
+}
+
+async function renderRecordsReset(){
+  const start = $('#recStart').value || todayYMD();
+  const end   = $('#recEnd').value   || $('#recStart').value || todayYMD();
+  recQueryRange = {start, end};
+  recLastDoc = null; recHasMore = true;
+  $('#recList').innerHTML = '<div class="recEmpty">Caricamento…</div>';
+  const {rows,lastDoc,size} = await fetchRecordsPage(currentUid, start, end, null);
+  const list = $('#recList');
+  if (!size){ list.innerHTML = '<div class="recEmpty">Nessun record nel periodo selezionato.</div>'; $('#recCount').textContent = '(0)'; recHasMore=false; return; }
+  list.innerHTML = rows.map(recItemHTML).join('');
+  $('#recCount').textContent = `(${size}${recHasMore?'+' : ''})`;
+  recLastDoc = lastDoc;
+  recHasMore = !!lastDoc;
+  $('#loadMore').disabled = !recHasMore;
+}
+
+async function renderRecordsMore(){
+  if (!recHasMore) return;
+  const {start,end} = recQueryRange;
+  const {rows,lastDoc,size} = await fetchRecordsPage(currentUid, start, end, recLastDoc);
+  if (!size){ recHasMore=false; $('#loadMore').disabled = true; return; }
+  const list = $('#recList');
+  rows.forEach(r=>{
+    const temp = document.createElement('div');
+    temp.innerHTML = recItemHTML(r);
+    list.appendChild(temp.firstElementChild);
+  });
+  recLastDoc = lastDoc;
+  recHasMore = !!lastDoc;
+  $('#loadMore').disabled = !recHasMore;
+  // aggiorno conteggio (approx.)
+  const cur = parseInt(($('#recCount').textContent.match(/\d+/)||[0])[0],10) || 0;
+  $('#recCount').textContent = `(${cur + size})`;
+}
+
+function enableEdit(item, on){
+  ['.rAct','.rTag','.rTime'].forEach(sel=>{
+    const el = item.querySelector(sel);
+    el.disabled = !on;
+  });
+  const editBtn = item.querySelector('.edit');
+  editBtn.textContent = on ? '💾' : '✏️';
+  editBtn.title = on ? 'Salva' : 'Modifica';
+  editBtn.classList.toggle('save', on);
+}
+
 function recBindEvents(){
-  $('#recRefresh').addEventListener('click', renderRecords);
-  $('#recSearch').addEventListener('input', ()=>{ // live filter senza hit DB
+  // refresh
+  $('#recRefresh').addEventListener('click', renderRecordsReset);
+  // live filter (sui risultati già caricati)
+  $('#recSearch').addEventListener('input', ()=>{
     const q = ($('#recSearch').value||'').toLowerCase();
     const items = Array.from(document.querySelectorAll('.recItem'));
     let vis=0;
@@ -549,20 +644,27 @@ function recBindEvents(){
       const tag = el.querySelector('.rTag').value.toLowerCase();
       const show = !q || act.includes(q) || tag.includes(q);
       el.style.display = show ? '' : 'none';
-      if(show) vis++;
+      if (show) vis++;
     });
-    $('#recCount').textContent = `(${vis})`;
+    $('#recCount').textContent = `(${vis}${recHasMore?'+':''})`;
   });
+  // azioni item
   $('#recList').addEventListener('click', async (e)=>{
     const btn = e.target.closest('button'); if(!btn) return;
     const item = e.target.closest('.recItem'); const id = item?.dataset?.id; if(!id) return;
-    const act = item.querySelector('.rAct').value.trim();
-    const tag = item.querySelector('.rTag').value.trim();
-    const tim = fromLocalDTValue(item.querySelector('.rTime').value);
-    if(btn.classList.contains('save')){
+
+    if(btn.classList.contains('edit')){
+      // toggle edit/save
+      const saving = btn.classList.contains('save');
+      if (!saving){ enableEdit(item, true); return; }
+      // salva
+      const act = item.querySelector('.rAct').value.trim();
+      const tag = item.querySelector('.rTag').value.trim();
+      const tim = fromLocalDTValue(item.querySelector('.rTime').value);
       try{
         await col(currentUid).doc(id).update({ activity: act, tag, timestamp: tim });
-        btn.textContent='✓ Salvato'; setTimeout(()=>btn.textContent='Salva', 1000);
+        enableEdit(item, false);
+        btn.classList.remove('save');
       }catch(err){ alert('Errore salvataggio: '+err.message); }
     } else if(btn.classList.contains('del')){
       if(!confirm('Eliminare questo record?')) return;
@@ -570,10 +672,13 @@ function recBindEvents(){
         await col(currentUid).doc(id).delete();
         item.remove();
         const cur = parseInt(($('#recCount').textContent.match(/\d+/)||[0])[0],10)||1;
-        $('#recCount').textContent = `(${Math.max(0,cur-1)})`;
+        $('#recCount').textContent = `(${Math.max(0,cur-1)}${recHasMore?'+':''})`;
       }catch(err){ alert('Errore eliminazione: '+err.message); }
     }
   });
+
+  // paging
+  $('#loadMore').addEventListener('click', renderRecordsMore);
 }
 
 /* ===== Boot ===== */
@@ -588,6 +693,8 @@ document.addEventListener('DOMContentLoaded', ()=>{
     if(!u){ location.href='index.html'; return; }
     currentUid = u.uid; $('#userLabel').textContent = u.email || u.uid;
     await renderAll();
+    // costruisci tag cloud dopo i grafici (non blocca)
+    buildTagCloud(currentUid);
   });
 
   // day nav
@@ -613,7 +720,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
     const entries = Object.entries(customMap);
     if (!entries.length){ box.innerHTML = `<span class="pill muted">Nessuna mappatura</span>`; return; }
     entries.forEach(([tag,cat])=>{
-      const color = cat==='good'?'var(--good)':cat==='bad'?'var(--bad)':cat==='non'?'#8b5cf6':'var(--neutral)';
+      const color = cat==='good'?'var(--good)':cat==='bad'?'var(--bad)':cat==='non'?'var(--warn)':'var(--neutral)';
       box.innerHTML += `<span class="pill" style="border-color:${color}; color:${color}">${tag} → ${cat}</span>`;
     });
   };
@@ -623,24 +730,25 @@ document.addEventListener('DOMContentLoaded', ()=>{
     const p = $('#gearPanel'); const open = !p.classList.contains('show');
     p.classList.toggle('show', open);
     p.setAttribute('aria-hidden', open?'false':'true');
-    renderMapList();
+    if (open) buildTagCloud(currentUid);
   });
   $('#saveMap').addEventListener('click', ()=>{
     const name = String($('#tagName').value||'').trim(); if (!name) return;
     const cat = $('#tagCat').value;
     customMap[name] = cat; saveCustomMap(customMap);
-    renderMapList(); renderAll();
+    $('#tagName').value = '';
+    renderMapList(); renderAll(); buildTagCloud(currentUid);
   });
   $('#resetMap').addEventListener('click', ()=>{
     if(!confirm('Cancellare tutte le mappature personalizzate?')) return;
     customMap = {}; saveCustomMap(customMap);
-    renderMapList(); renderAll();
+    renderMapList(); renderAll(); buildTagCloud(currentUid);
   });
 
   // records panel
   recBindEvents();
   $('#recPanel').addEventListener('toggle', ()=>{
-    if($('#recPanel').open){ renderRecords(); }
+    if($('#recPanel').open){ renderRecordsReset(); }
   });
 });
 </script>
