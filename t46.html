@@ -67,11 +67,11 @@
   .bar .neutral{background:var(--neutral)}
   .bar .bad{background:var(--bad)}
 
-  /* Tabelle compatte e leggibili su mobile */
+  /* Tabelle */
   table{width:100%; border-collapse:collapse; margin-top:6px; table-layout:fixed}
-  th, td{border:1px solid var(--line); padding:4px 6px; font-size:13px}
+  th, td{border:1px solid var(--line); padding:6px 8px; font-size:13px; vertical-align:middle}
   th{background:transparent; text-align:left; font-weight:700}
-  td:nth-child(2), td:nth-child(3){ text-align:center }
+  td.c{text-align:center}
   tr.good{background:var(--good-bg)}
   tr.neutral{background:var(--neutral-bg)}
   tr.bad{background:var(--bad-bg)}
@@ -89,28 +89,14 @@
   .cloud .pill{ cursor:pointer; }
   .pill.warn{ border-color: var(--warn); color: var(--warn); }
 
-  /* ====== Pannello RECORD (a tendina) ====== */
-  details.rec{ border:1px solid var(--line); border-radius:12px; padding:10px; background:var(--card) }
-  details.rec > summary{ cursor:pointer; display:flex; align-items:center; gap:8px; list-style:none; font-weight:700 }
-  details.rec > summary::-webkit-details-marker{ display:none }
-  .recHead{ display:flex; gap:6px; align-items:center; flex-wrap:wrap; margin-top:8px }
-  .recHead input, .recHead select, .recHead button{ padding:8px 10px; border:1px solid var(--line); border-radius:8px; font-size:14px; background:transparent; color:var(--text) }
-  .recList{ margin-top:8px; display:grid; gap:8px }
-  .recItem{ border:1px solid var(--line); border-radius:12px; padding:8px; display:grid; grid-template-columns:1fr; gap:6px; background:transparent }
-  .recRow{ display:grid; grid-template-columns: 1fr 120px; gap:6px }
-  .recRow3{ display:grid; grid-template-columns: 1fr auto; gap:6px; align-items:center }
-  .recAct{ display:flex; gap:6px; justify-content:flex-end }
-  .iconBtn{ padding:8px 10px; border:1px solid var(--line); border-radius:8px; background:transparent; color:var(--text); cursor:pointer; min-width:auto }
+  /* RECORDS tabella */
+  .iconBtn{ padding:6px 10px; border:1px solid var(--line); border-radius:8px; background:transparent; color:var(--text); cursor:pointer; min-width:auto }
   .iconBtn.save{ background:var(--good); color:#fff; border-color:var(--good) }
   .iconBtn.del{ background:var(--bad); color:#fff; border-color:var(--bad) }
-  .recEmpty{ text-align:center; color:var(--muted); font-size:13px; padding:10px }
+  .recCtrl{ display:flex; gap:6px; align-items:center; flex-wrap:wrap; margin-top:8px }
+  .recCtrl input, .recCtrl button{ padding:8px 10px; border:1px solid var(--line); border-radius:8px; font-size:14px; background:transparent; color:var(--text) }
+  .loadMore{ border:1px solid var(--line); background:transparent; color:var(--text); border-radius:8px; padding:8px 12px; cursor:pointer; display:block; margin:8px auto 0 }
   .recCount{ font-size:12px; color:var(--muted) }
-  .recFoot{ display:flex; justify-content:center; margin-top:6px }
-  .loadMore{ border:1px solid var(--line); background:transparent; color:var(--text); border-radius:8px; padding:8px 12px; cursor:pointer }
-
-  @media(min-width:720px){
-    .row{ display:grid; grid-template-columns: 1fr 1fr; gap:12px }
-  }
 </style>
 </head>
 <body>
@@ -214,20 +200,30 @@
     </div>
   </section>
 
-  <!-- ======= PANNELLO RECORD (a tendina) ======= -->
-  <details id="recPanel" class="rec">
-    <summary>📚 Dati inseriti (DB) <span id="recCount" class="recCount">—</span></summary>
-    <div class="recHead">
+  <!-- ======= PANNELLO RECORD (TABELLARE) ======= -->
+  <section class="card">
+    <h2 class="title">📚 Dati inseriti (DB) <span id="recCount" class="recCount">—</span></h2>
+    <div class="recCtrl">
       <input type="date" id="recStart">
       <input type="date" id="recEnd">
       <input id="recSearch" placeholder="Filtra per testo/tag" />
       <button id="recRefresh">Aggiorna</button>
     </div>
-    <div id="recList" class="recList">
-      <div class="recEmpty">Nessun record nel periodo selezionato.</div>
-    </div>
-    <div class="recFoot"><button id="loadMore" class="loadMore">Carica altri</button></div>
-  </details>
+    <table id="recTable">
+      <thead>
+        <tr>
+          <th style="width:45%">Attività</th>
+          <th style="width:20%">Tag</th>
+          <th style="width:25%">Data/ora</th>
+          <th style="width:10%" class="c">Azioni</th>
+        </tr>
+      </thead>
+      <tbody id="recTbody">
+        <tr><td colspan="4" class="c muted">Nessun record nel periodo selezionato.</td></tr>
+      </tbody>
+    </table>
+    <button id="loadMore" class="loadMore">Carica altri</button>
+  </section>
 </div>
 
 <script>
@@ -414,7 +410,7 @@ async function renderDay(uid, ymd){
     const cat = tagCategory(tag);
     const cls = (cat==='good'?'good':cat==='bad'?'bad':(cat==='non'?'':'neutral'));
     const pct = percent(min, total);
-    tbody.innerHTML += `<tr class="${cls}"><td>${tag}</td><td>${fmtHM(min)}</td><td>${pct}%</td></tr>`;
+    tbody.innerHTML += `<tr class="${cls}"><td>${tag}</td><td class="c">${fmtHM(min)}</td><td class="c">${pct}%</td></tr>`;
   });
 }
 
@@ -489,7 +485,7 @@ async function renderPeriod(uid){
     const cat = tagCategory(tag);
     const cls = (cat==='good'?'good':cat==='bad'?'bad':(cat==='non'?'':'neutral'));
     const pct = percent(min, total);
-    tbody.innerHTML += `<tr class="${cls}"><td>${tag}</td><td>${fmtHM(min)}</td><td>${pct}%</td></tr>`;
+    tbody.innerHTML += `<tr class="${cls}"><td>${tag}</td><td class="c">${fmtHM(min)}</td><td class="c">${pct}%</td></tr>`;
   });
 }
 
@@ -539,7 +535,7 @@ async function buildTagCloud(uid){
   });
 }
 
-/* ===== RECORDS panel: paging + UX ✏️🗑️ ===== */
+/* ===== RECORDS tabella: paging + ✏️/💾/🗑️ ===== */
 function toLocalDTValue(iso){ if(!iso) return ''; return iso.slice(0,16); }
 function fromLocalDTValue(v){ return v; }
 
@@ -566,23 +562,19 @@ async function fetchRecordsPage(uid, startYmd, endYmd, afterDoc){
   return {rows: out, lastDoc: last, empty: snap.empty, size: snap.size};
 }
 
-function recItemHTML(rec){
-  const safeAct = (rec.activity||'').replaceAll('<','&lt;');
-  const safeTag = (rec.tag||'').replaceAll('<','&lt;');
+function rowHTML(r){
+  const safeAct = (r.activity||'').replaceAll('<','&lt;');
+  const safeTag = (r.tag||'').replaceAll('<','&lt;');
   return `
-    <div class="recItem" data-id="${rec.id}">
-      <div class="recRow">
-        <input class="rAct" placeholder="Attività" value="${safeAct}" disabled>
-        <input class="rTag" placeholder="Tag" value="${safeTag}" disabled>
-      </div>
-      <div class="recRow3">
-        <input class="rTime" type="datetime-local" value="${toLocalDTValue(rec.timestamp)}" disabled>
-        <div class="recAct">
-          <button class="iconBtn edit" title="Modifica">✏️</button>
-          <button class="iconBtn del" title="Elimina">🗑️</button>
-        </div>
-      </div>
-    </div>`;
+    <tr data-id="${r.id}">
+      <td><input class="rAct" value="${safeAct}" disabled></td>
+      <td><input class="rTag" value="${safeTag}" disabled></td>
+      <td><input class="rTime" type="datetime-local" value="${toLocalDTValue(r.timestamp)}" disabled></td>
+      <td class="c">
+        <button class="iconBtn edit" title="Modifica">✏️</button>
+        <button class="iconBtn del" title="Elimina">🗑️</button>
+      </td>
+    </tr>`;
 }
 
 async function renderRecordsReset(){
@@ -590,12 +582,11 @@ async function renderRecordsReset(){
   const end   = $('#recEnd').value   || $('#recStart').value || todayYMD();
   recQueryRange = {start, end};
   recLastDoc = null; recHasMore = true;
-  $('#recList').innerHTML = '<div class="recEmpty">Caricamento…</div>';
+  const body = $('#recTbody'); body.innerHTML = `<tr><td colspan="4" class="c muted">Caricamento…</td></tr>`;
   const {rows,lastDoc,size} = await fetchRecordsPage(currentUid, start, end, null);
-  const list = $('#recList');
-  if (!size){ list.innerHTML = '<div class="recEmpty">Nessun record nel periodo selezionato.</div>'; $('#recCount').textContent = '(0)'; recHasMore=false; return; }
-  list.innerHTML = rows.map(recItemHTML).join('');
-  $('#recCount').textContent = `(${size}${recHasMore?'+' : ''})`;
+  if (!size){ body.innerHTML = `<tr><td colspan="4" class="c muted">Nessun record nel periodo selezionato.</td></tr>`; $('#recCount').textContent = '(0)'; recHasMore=false; $('#loadMore').disabled=true; return; }
+  body.innerHTML = rows.map(rowHTML).join('');
+  $('#recCount').textContent = `(${size}${lastDoc?'+':''})`;
   recLastDoc = lastDoc;
   recHasMore = !!lastDoc;
   $('#loadMore').disabled = !recHasMore;
@@ -606,73 +597,77 @@ async function renderRecordsMore(){
   const {start,end} = recQueryRange;
   const {rows,lastDoc,size} = await fetchRecordsPage(currentUid, start, end, recLastDoc);
   if (!size){ recHasMore=false; $('#loadMore').disabled = true; return; }
-  const list = $('#recList');
+  const body = $('#recTbody');
   rows.forEach(r=>{
-    const temp = document.createElement('div');
-    temp.innerHTML = recItemHTML(r);
-    list.appendChild(temp.firstElementChild);
+    const temp = document.createElement('tbody');
+    temp.innerHTML = rowHTML(r);
+    body.appendChild(temp.firstElementChild);
   });
   recLastDoc = lastDoc;
   recHasMore = !!lastDoc;
   $('#loadMore').disabled = !recHasMore;
-  // aggiorno conteggio (approx.)
+  // aggiorna conteggio approx
   const cur = parseInt(($('#recCount').textContent.match(/\d+/)||[0])[0],10) || 0;
-  $('#recCount').textContent = `(${cur + size})`;
+  $('#recCount').textContent = `(${cur + size}${recHasMore?'+':''})`;
 }
 
-function enableEdit(item, on){
+function toggleRowEdit(tr, on){
   ['.rAct','.rTag','.rTime'].forEach(sel=>{
-    const el = item.querySelector(sel);
+    const el = tr.querySelector(sel);
     el.disabled = !on;
   });
-  const editBtn = item.querySelector('.edit');
+  const editBtn = tr.querySelector('.edit');
   editBtn.textContent = on ? '💾' : '✏️';
   editBtn.title = on ? 'Salva' : 'Modifica';
   editBtn.classList.toggle('save', on);
 }
 
-function recBindEvents(){
+function bindRecordEvents(){
   // refresh
   $('#recRefresh').addEventListener('click', renderRecordsReset);
-  // live filter (sui risultati già caricati)
+
+  // live filter client-side (sulle righe caricate)
   $('#recSearch').addEventListener('input', ()=>{
     const q = ($('#recSearch').value||'').toLowerCase();
-    const items = Array.from(document.querySelectorAll('.recItem'));
+    const rows = Array.from(document.querySelectorAll('#recTbody tr'));
     let vis=0;
-    items.forEach(el=>{
-      const act = el.querySelector('.rAct').value.toLowerCase();
-      const tag = el.querySelector('.rTag').value.toLowerCase();
+    rows.forEach(tr=>{
+      const act = tr.querySelector('.rAct')?.value.toLowerCase() || '';
+      const tag = tr.querySelector('.rTag')?.value.toLowerCase() || '';
       const show = !q || act.includes(q) || tag.includes(q);
-      el.style.display = show ? '' : 'none';
+      tr.style.display = show ? '' : 'none';
       if (show) vis++;
     });
     $('#recCount').textContent = `(${vis}${recHasMore?'+':''})`;
   });
-  // azioni item
-  $('#recList').addEventListener('click', async (e)=>{
+
+  // azioni per riga
+  $('#recTbody').addEventListener('click', async (e)=>{
     const btn = e.target.closest('button'); if(!btn) return;
-    const item = e.target.closest('.recItem'); const id = item?.dataset?.id; if(!id) return;
+    const tr = e.target.closest('tr'); const id = tr?.dataset?.id; if(!id) return;
 
     if(btn.classList.contains('edit')){
-      // toggle edit/save
       const saving = btn.classList.contains('save');
-      if (!saving){ enableEdit(item, true); return; }
+      if (!saving){ toggleRowEdit(tr, true); return; }
       // salva
-      const act = item.querySelector('.rAct').value.trim();
-      const tag = item.querySelector('.rTag').value.trim();
-      const tim = fromLocalDTValue(item.querySelector('.rTime').value);
+      const act = tr.querySelector('.rAct').value.trim();
+      const tag = tr.querySelector('.rTag').value.trim();
+      const tim = fromLocalDTValue(tr.querySelector('.rTime').value);
       try{
         await col(currentUid).doc(id).update({ activity: act, tag, timestamp: tim });
-        enableEdit(item, false);
+        toggleRowEdit(tr, false);
         btn.classList.remove('save');
       }catch(err){ alert('Errore salvataggio: '+err.message); }
     } else if(btn.classList.contains('del')){
       if(!confirm('Eliminare questo record?')) return;
       try{
         await col(currentUid).doc(id).delete();
-        item.remove();
+        tr.remove();
         const cur = parseInt(($('#recCount').textContent.match(/\d+/)||[0])[0],10)||1;
         $('#recCount').textContent = `(${Math.max(0,cur-1)}${recHasMore?'+':''})`;
+        if (!document.querySelector('#recTbody tr')){
+          $('#recTbody').innerHTML = `<tr><td colspan="4" class="c muted">Nessun record nel periodo selezionato.</td></tr>`;
+        }
       }catch(err){ alert('Errore eliminazione: '+err.message); }
     }
   });
@@ -693,7 +688,6 @@ document.addEventListener('DOMContentLoaded', ()=>{
     if(!u){ location.href='index.html'; return; }
     currentUid = u.uid; $('#userLabel').textContent = u.email || u.uid;
     await renderAll();
-    // costruisci tag cloud dopo i grafici (non blocca)
     buildTagCloud(currentUid);
   });
 
@@ -745,11 +739,10 @@ document.addEventListener('DOMContentLoaded', ()=>{
     renderMapList(); renderAll(); buildTagCloud(currentUid);
   });
 
-  // records panel
-  recBindEvents();
-  $('#recPanel').addEventListener('toggle', ()=>{
-    if($('#recPanel').open){ renderRecordsReset(); }
-  });
+  // records tabella
+  bindRecordEvents();
+  // carica prima pagina all’apertura
+  renderRecordsReset();
 });
 </script>
 </body>
