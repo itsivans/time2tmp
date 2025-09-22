@@ -20,12 +20,14 @@
     --good:#06c167; --neutral:#6b7280; --bad:#ff2d55; /* più accesi */
     --good-bg:#e9fff4; --neutral-bg:#f3f4f6; --bad-bg:#ffe9ee;
     --link:#1e88e5;
+    --chip:#eef2f7; --chipText:#334155;
   }
   [data-theme="dark"]{
     --bg:#0b1118; --text:#e6edf3; --muted:#94a3b8; --line:#1f2937; --card:#0f1620;
     --good:#22d47b; --neutral:#a6adbb; --bad:#ff4d6d;
     --good-bg:#0d2a1e; --neutral-bg:#141a23; --bad-bg:#2a0f15;
     --link:#62a8ff;
+    --chip:#151c27; --chipText:#cdd6e1;
   }
 
   *{box-sizing:border-box}
@@ -37,9 +39,9 @@
   .muted{color:var(--muted); font-size:12px}
   .toggle{border:1px solid var(--line); background:transparent; color:var(--text); border-radius:8px; padding:8px 10px; cursor:pointer}
 
-  .wrap{padding:14px 16px; display:grid; gap:14px}
+  .wrap{padding:14px 16px; display:grid; gap:14px; max-width:880px; margin:0 auto}
   .card{background:var(--card); border:1px solid var(--line); border-radius:12px; padding:12px}
-  .title{margin:0 0 4px; font-size:16px; font-weight:800}
+  .title{margin:0 0 4px; font-size:16px; font-weight:800; text-align:center}
 
   .toolbar{display:flex; gap:8px; align-items:center; flex-wrap:wrap}
   .toolbar input[type="date"], .toolbar select{
@@ -48,33 +50,31 @@
   .navbtn{width:36px; height:36px; border-radius:8px; border:1px solid var(--line); background:transparent; color:var(--text); cursor:pointer; font-size:16px}
   .gear{margin-left:auto; cursor:pointer; font-size:18px; opacity:.8}
 
-  .chartBox{width:100%; max-width:360px; margin:auto}
+  .chartBox{width:100%; max-width:420px; margin:6px auto}
   .chartBox canvas{width:100% !important; height:220px !important; display:block}
   .chartBox.small canvas{height:160px !important}
+  .chartNote{ text-align:center; font-size:12px; color:var(--muted); margin-top:2px }
 
-  .chips{display:flex; gap:8px; flex-wrap:wrap; margin-top:8px}
-  .chip{padding:6px 10px; border:1px solid var(--line); border-radius:10px; background:transparent; color:var(--text); font-size:13px; white-space:nowrap}
+  .chips{display:flex; gap:6px; flex-wrap:wrap; margin-top:8px; justify-content:center}
+  .chip{padding:6px 10px; border:1px solid var(--line); border-radius:999px; background:var(--chip); color:var(--chipText); font-size:12px; white-space:nowrap}
 
-  .bar{height:10px; width:100%; background:#eef2f7; border-radius:999px; overflow:hidden; margin-top:10px}
+  .bar{height:10px; width:100%; background:#eef2f7; border-radius:999px; overflow:hidden; margin:10px auto 0; max-width:420px}
   [data-theme="dark"] .bar{background:#1f2732}
   .bar > span{display:block; height:100%}
   .bar .good{background:var(--good)}
   .bar .neutral{background:var(--neutral)}
   .bar .bad{background:var(--bad)}
 
-  table{width:100%; border-collapse:collapse; margin-top:8px}
-  th, td{border:1px solid var(--line); padding:6px 8px; font-size:14px}
-  th{background:transparent; text-align:left}
+  /* Tabelle compatte e leggibili su mobile */
+  table{width:100%; border-collapse:collapse; margin-top:6px; table-layout:fixed}
+  th, td{border:1px solid var(--line); padding:4px 6px; font-size:13px}
+  th{background:transparent; text-align:left; font-weight:700}
+  td:nth-child(2), td:nth-child(3){ text-align:center }
   tr.good{background:var(--good-bg)}
   tr.neutral{background:var(--neutral-bg)}
   tr.bad{background:var(--bad-bg)}
 
-  .toggles{display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-top:6px}
-  label.chk{display:inline-flex; align-items:center; gap:6px; font-size:13px; color:var(--text)}
-  label.chk input{accent-color:var(--text)}
-  .dot{display:inline-block; width:10px; height:10px; border-radius:999px}
-  .dot.good{background:var(--good)} .dot.neutral{background:var(--neutral)} .dot.bad{background:var(--bad)}
-
+  /* Pannello impostazioni tag */
   .panel{display:none; padding:10px; border:1px dashed var(--line); border-radius:10px; background:transparent; margin-top:6px}
   .panel.show{display:block}
   .panel .row{display:flex; gap:8px; flex-wrap:wrap}
@@ -82,6 +82,27 @@
   .panel button{background:var(--text); color:var(--bg); cursor:pointer; border-color:var(--text)}
   .maplist{margin-top:6px; display:flex; gap:6px; flex-wrap:wrap}
   .pill{border:1px solid var(--line); border-radius:999px; padding:4px 8px; font-size:12px}
+
+  /* ====== Pannello RECORD (a tendina) ====== */
+  details.rec{ border:1px solid var(--line); border-radius:12px; padding:10px; background:var(--card) }
+  details.rec > summary{ cursor:pointer; display:flex; align-items:center; gap:8px; list-style:none; font-weight:700 }
+  details.rec > summary::-webkit-details-marker{ display:none }
+  .recHead{ display:flex; gap:6px; align-items:center; flex-wrap:wrap; margin-top:8px }
+  .recHead input, .recHead select, .recHead button{ padding:8px 10px; border:1px solid var(--line); border-radius:8px; font-size:14px; background:transparent; color:var(--text) }
+  .recList{ margin-top:8px; display:grid; gap:8px }
+  .recItem{ border:1px solid var(--line); border-radius:12px; padding:8px; display:grid; grid-template-columns:1fr; gap:6px; background:transparent }
+  .recRow{ display:grid; grid-template-columns: 1fr 120px; gap:6px }
+  .recRow3{ display:grid; grid-template-columns: 1fr 1fr; gap:6px }
+  .recAct{ display:flex; gap:6px; justify-content:flex-end }
+  .recAct button{ padding:8px 10px; border:1px solid var(--line); border-radius:8px; background:transparent; color:var(--text); cursor:pointer }
+  .recAct .save{ background:var(--good); color:#fff; border-color:var(--good) }
+  .recAct .del{ background:var(--bad); color:#fff; border-color:var(--bad) }
+  .recEmpty{ text-align:center; color:var(--muted); font-size:13px; padding:10px }
+  .recCount{ font-size:12px; color:var(--muted) }
+
+  @media(min-width:720px){
+    .row{ display:grid; grid-template-columns: 1fr 1fr; gap:12px }
+  }
 </style>
 </head>
 <body>
@@ -127,6 +148,7 @@
     <div class="row">
       <div class="col">
         <div class="chartBox"><canvas id="dailyDonut"></canvas></div>
+        <div class="chartNote">Donut: % sul tempo <b>disponibile</b> oggi (escluso Non gestibile).</div>
         <div class="chips">
           <span class="chip">Disponibile: <b id="d_avail">—</b></span>
           <span class="chip">Rimanente: <b id="d_remaining">—</b></span>
@@ -140,7 +162,7 @@
       </div>
       <div class="col">
         <table>
-          <thead><tr><th>Tag</th><th>Tempo</th><th>%</th></tr></thead>
+          <thead><tr><th style="width:60%">Tag</th><th style="width:20%">Tempo</th><th style="width:20%">%</th></tr></thead>
           <tbody id="dailyRank"></tbody>
         </table>
       </div>
@@ -150,7 +172,7 @@
   <!-- PERIODO (Settimana/Mese/Anno) -->
   <section class="card">
     <h2 class="title">Periodo</h2>
-    <div class="toolbar">
+    <div class="toolbar" style="justify-content:center">
       <span class="muted">Tipo:</span>
       <select id="perType">
         <option value="week" selected>Settimana</option>
@@ -162,7 +184,7 @@
       <button id="perApply" class="toggle">Applica</button>
     </div>
 
-    <div class="toggles">
+    <div class="toggles" style="justify-content:center">
       <label class="chk"><input type="checkbox" id="tgGood" checked><span class="dot good"></span>Produttivo</label>
       <label class="chk"><input type="checkbox" id="tgNeutral"><span class="dot neutral"></span>Neutro</label>
       <label class="chk"><input type="checkbox" id="tgBad" checked><span class="dot bad"></span>Spreco</label>
@@ -171,15 +193,30 @@
     <div class="row" style="margin-top:6px">
       <div class="col">
         <div class="chartBox small"><canvas id="perTrend"></canvas></div>
+        <div class="chartNote">Linea: X = giorni nel periodo, Y = % del tempo <b>disponibile</b> speso in ciascun bucket.</div>
       </div>
       <div class="col">
         <table>
-          <thead><tr><th>Tag</th><th>Tempo</th><th>%</th></tr></thead>
+          <thead><tr><th style="width:60%">Tag</th><th style="width:20%">Tempo</th><th style="width:20%">%</th></tr></thead>
           <tbody id="perRank"></tbody>
         </table>
       </div>
     </div>
   </section>
+
+  <!-- ======= PANNELLO RECORD (a tendina) ======= -->
+  <details id="recPanel" class="rec">
+    <summary>📚 Dati inseriti (DB) <span id="recCount" class="recCount">—</span></summary>
+    <div class="recHead">
+      <input type="date" id="recStart">
+      <input type="date" id="recEnd">
+      <input id="recSearch" placeholder="Filtra per testo/tag" />
+      <button id="recRefresh">Aggiorna</button>
+    </div>
+    <div id="recList" class="recList">
+      <div class="recEmpty">Nessun record nel periodo selezionato.</div>
+    </div>
+  </details>
 </div>
 
 <script>
@@ -201,7 +238,8 @@ const db = firebase.firestore();
 const THEME_KEY = 'tt_theme';
 function applyTheme(t){ document.documentElement.setAttribute('data-theme', t); localStorage.setItem(THEME_KEY, t); document.getElementById('themeBtn').textContent = (t==='dark'?'☀️':'🌙'); }
 (function initTheme(){ applyTheme(localStorage.getItem(THEME_KEY)||'light'); })();
-document.getElementById('themeBtn').addEventListener('click', ()=>{
+const themeBtnEl = document.getElementById('themeBtn');
+themeBtnEl.addEventListener('click', ()=>{
   const cur = document.documentElement.getAttribute('data-theme');
   applyTheme(cur==='dark'?'light':'dark');
 });
@@ -349,7 +387,7 @@ async function renderDay(uid, ymd){
   // barra % su disponibile
   const gP = percent(totals.good, totals.avail);
   const nP = percent(totals.neutral, totals.avail);
-  const bP = percent(totals.bad, totals.avail);
+  const bP = percent(totals.bad,  totals.avail);
   $('#d_bar_good').style.width = gP + '%';
   $('#d_bar_neut').style.width = (gP+nP) + '%';
   $('#d_bar_wast').style.width = (gP+nP+bP) + '%';
@@ -450,11 +488,100 @@ async function renderAll(){
   $('#loading').textContent = 'Pronto';
 }
 
+/* ===== RECORDS panel ===== */
+function toLocalDTValue(iso){
+  if(!iso) return '';
+  // expect ISO like 2025-09-22T12:34 or 2025-09-22T12:34:56
+  return iso.slice(0,16);
+}
+function fromLocalDTValue(v){
+  // datetime-local back to ISO without seconds
+  return v; // già in formato YYYY-MM-DDTHH:MM
+}
+
+async function fetchRecords(uid, startYmd, endYmd){
+  const snap = await col(uid)
+    .where('timestamp','>=', dayStart(startYmd))
+    .where('timestamp','<=', dayEnd(endYmd))
+    .orderBy('timestamp','desc')
+    .limit(200)
+    .get();
+  const arr=[]; snap.forEach(doc=>{ const d=doc.data(); arr.push({id:doc.id, activity:d.activity||'', tag:d.tag||'', timestamp:d.timestamp||''}); });
+  return arr;
+}
+
+async function renderRecords(){
+  const start = $('#recStart').value || todayYMD();
+  const end   = $('#recEnd').value   || $('#recStart').value || todayYMD();
+  const q     = ($('#recSearch').value||'').toLowerCase();
+  const list  = $('#recList'); list.innerHTML = '<div class="recEmpty">Caricamento…</div>';
+  const data  = await fetchRecords(currentUid, start, end);
+  const filtered = data.filter(r=> !q || r.activity.toLowerCase().includes(q) || r.tag.toLowerCase().includes(q));
+  $('#recCount').textContent = `(${filtered.length})`;
+  if(!filtered.length){ list.innerHTML = '<div class="recEmpty">Nessun record trovato.</div>'; return; }
+  list.innerHTML='';
+  filtered.forEach(rec=>{
+    const item = document.createElement('div'); item.className='recItem'; item.dataset.id=rec.id;
+    item.innerHTML = `
+      <div class="recRow">
+        <input class="rAct" placeholder="Attività" value="${rec.activity.replaceAll('<','&lt;')}">
+        <input class="rTag" placeholder="Tag" value="${rec.tag.replaceAll('<','&lt;')}">
+      </div>
+      <div class="recRow3">
+        <input class="rTime" type="datetime-local" value="${toLocalDTValue(rec.timestamp)}">
+        <div class="recAct">
+          <button class="save">Salva</button>
+          <button class="del">Elimina</button>
+        </div>
+      </div>`;
+    list.appendChild(item);
+  });
+}
+
+function recBindEvents(){
+  $('#recRefresh').addEventListener('click', renderRecords);
+  $('#recSearch').addEventListener('input', ()=>{ // live filter senza hit DB
+    const q = ($('#recSearch').value||'').toLowerCase();
+    const items = Array.from(document.querySelectorAll('.recItem'));
+    let vis=0;
+    items.forEach(el=>{
+      const act = el.querySelector('.rAct').value.toLowerCase();
+      const tag = el.querySelector('.rTag').value.toLowerCase();
+      const show = !q || act.includes(q) || tag.includes(q);
+      el.style.display = show ? '' : 'none';
+      if(show) vis++;
+    });
+    $('#recCount').textContent = `(${vis})`;
+  });
+  $('#recList').addEventListener('click', async (e)=>{
+    const btn = e.target.closest('button'); if(!btn) return;
+    const item = e.target.closest('.recItem'); const id = item?.dataset?.id; if(!id) return;
+    const act = item.querySelector('.rAct').value.trim();
+    const tag = item.querySelector('.rTag').value.trim();
+    const tim = fromLocalDTValue(item.querySelector('.rTime').value);
+    if(btn.classList.contains('save')){
+      try{
+        await col(currentUid).doc(id).update({ activity: act, tag, timestamp: tim });
+        btn.textContent='✓ Salvato'; setTimeout(()=>btn.textContent='Salva', 1000);
+      }catch(err){ alert('Errore salvataggio: '+err.message); }
+    } else if(btn.classList.contains('del')){
+      if(!confirm('Eliminare questo record?')) return;
+      try{
+        await col(currentUid).doc(id).delete();
+        item.remove();
+        const cur = parseInt(($('#recCount').textContent.match(/\d+/)||[0])[0],10)||1;
+        $('#recCount').textContent = `(${Math.max(0,cur-1)})`;
+      }catch(err){ alert('Errore eliminazione: '+err.message); }
+    }
+  });
+}
+
 /* ===== Boot ===== */
 document.addEventListener('DOMContentLoaded', ()=>{
   const t = todayYMD();
   $('#dayPick').value = t;
   $('#perEnd').value = t;
+  $('#recStart').value = t; $('#recEnd').value = t;
 
   // auth
   auth.onAuthStateChanged(async u=>{
@@ -508,6 +635,12 @@ document.addEventListener('DOMContentLoaded', ()=>{
     if(!confirm('Cancellare tutte le mappature personalizzate?')) return;
     customMap = {}; saveCustomMap(customMap);
     renderMapList(); renderAll();
+  });
+
+  // records panel
+  recBindEvents();
+  $('#recPanel').addEventListener('toggle', ()=>{
+    if($('#recPanel').open){ renderRecords(); }
   });
 });
 </script>
