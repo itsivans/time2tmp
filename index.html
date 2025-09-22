@@ -66,6 +66,10 @@
     .row > *{ flex:1 1 240px; min-width:0; }
     @media (max-width:420px){ .row > *{ flex-basis:100%; } }
 
+    /* Titoli e microcopy centrati per mobile */
+    .card h3{ text-align:center; margin:6px 0 10px; }
+    #msg{ text-align:center; }
+
     /* Aggiungi (centrato, grande) */
     .addWrap{ display:flex; justify-content:center; }
     #addBtn{
@@ -78,6 +82,7 @@
       background:var(--primary); color:#fff; border:none; border-radius:10px;
       margin-top:16px; font-weight:bold; width:100%; min-height:48px;
     }
+    a[href="statistics.html"]{ display:block; }
 
     /* Tools in alto a destra: tema + chip utente */
     .top-tools{
@@ -134,6 +139,10 @@
     .preauth #authBox, .preauth #appBox, .preauth .top-tools{ display:none !important; }
     #splash{ display:none; }
     .preauth #splash{ display:flex; }
+
+    /* Ultimo record */
+    .lastrecord{ text-align:center; font-size:12px; opacity:.85; margin-top:6px; }
+    .lastrecord b{ font-weight:600; }
   </style>
 </head>
 <body class="preauth">
@@ -178,7 +187,7 @@
         <button id="loginBtn">Accedi</button>
         <button id="signupBtn">Registrati</button>
       </div>
-      <p class="muted">Devi essere loggato per inserire attività e vedere le statistiche.</p>
+      <p class="muted" style="text-align:center">Devi essere loggato per inserire attività e vedere le statistiche.</p>
     </div>
 
     <!-- APP -->
@@ -211,6 +220,9 @@
         </div>
 
         <div class="addWrap"><button id="addBtn">➕ Aggiungi</button></div>
+
+        <!-- Ultimo record (microcopy) -->
+        <div id="lastRecord" class="muted lastrecord" aria-live="polite"></div>
 
         <div id="msg" class="muted" style="margin-top:6px"></div>
       </div>
@@ -264,16 +276,18 @@
 
     /* ===== Helpers UI ===== */
     const $ = s => document.querySelector(s);
-    const authBox   = $('#authBox');
-    const appBox    = $('#appBox');
-    const statuschip= $('#statuschip');
-    const whoEl     = $('#who');
-    const msg       = $('#msg');
-    const toastEl   = $('#toast');
-    const nickPop   = $('#nickPop');
-    const nickInput = $('#nickInput');
+    const authBox    = $('#authBox');
+    const appBox     = $('#appBox');
+    const statuschip = $('#statuschip');
+    const whoEl      = $('#who');
+    const msg        = $('#msg');
+    const toastEl    = $('#toast');
+    const nickPop    = $('#nickPop');
+    const nickInput  = $('#nickInput');
+    const lastEl     = $('#lastRecord');
 
     const NICK_KEY = 'timeNickname';
+    const LAST_KEY = 'tt_last_rec';
 
     function setMsg(t){ msg.textContent = t || ''; }
     function showToast(text){
@@ -305,9 +319,32 @@
       }
     }
 
+    /* ===== Ultimo record (helpers) ===== */
+    function fmt(ts){
+      try{
+        const d = new Date(ts);
+        if(!isNaN(d)) return d.toLocaleString('it-IT', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' });
+      }catch{}
+      return ts;
+    }
+    function setLast(rec){
+      if(!rec){ lastEl.textContent=''; return; }
+      const {activity, tag, timestamp} = rec;
+      lastEl.innerHTML = `Ultimo inserito: <b>«${(activity||'').replaceAll('<','&lt;')}»</b> — ${tag||'-'} • ${fmt(timestamp||'')}`;
+    }
+    function saveLast(rec){ try{ localStorage.setItem(LAST_KEY, JSON.stringify(rec)); }catch{} }
+    function loadLast(){ try{ const v = localStorage.getItem(LAST_KEY); return v? JSON.parse(v): null; }catch{ return null } }
+
+    async function fetchLastFromDb(uid){
+      try{
+        const snap = await db.collection(`users/${uid}/activities`).orderBy('timestamp','desc').limit(1).get();
+        if(!snap.empty){ const data = snap.docs[0].data(); setLast(data); saveLast(data); }
+      }catch(e){ console.warn('Errore lettura ultimo record:', e.message); }
+    }
+
     /* ===== Auth state (anti-flash) ===== */
     let firstAuthEventHandled = false;
-    auth.onAuthStateChanged(user => {
+    auth.onAuthStateChanged(async user => {
       if (user) {
         authBox.classList.add('hidden');
         appBox.classList.remove('hidden');
@@ -321,11 +358,16 @@
         act.onkeydown = (e) => { if (e.key === 'Enter') $('#addBtn').click(); };
         act.onfocus   = () => { if (!dt.value) dt.value = getLocalISODateTimeNow(); };
 
+        // mostra ultimo record (prima locale, poi da DB)
+        setLast(loadLast());
+        await fetchLastFromDb(user.uid);
+
       } else {
         appBox.classList.add('hidden');
         authBox.classList.remove('hidden');
         statuschip.classList.remove('show');
         toggleNickPop(false);
+        setLast(null);
       }
 
       if (!firstAuthEventHandled) {
@@ -398,10 +440,14 @@
       if (!activity || !tag) return setMsg('Inserisci attività e tag!');
       if (!dateTime) dateTime = getLocalISODateTimeNow();
 
+      const record = { activity, tag, timestamp: dateTime };
+
       try {
-        await db.collection(`users/${user.uid}/activities`).add({ activity, tag, timestamp: dateTime });
+        await db.collection(`users/${user.uid}/activities`).add(record);
         $('#activity').value = ''; $('#dateTime').value = ''; $('#tag').value = '';
         setMsg('Attività salvata.'); showToast('✅ Attività inserita');
+        // aggiorna microcopy
+        setLast(record); saveLast(record);
       } catch (e) {
         console.error(e);
         setMsg('Errore nel salvataggio: ' + e.message);
