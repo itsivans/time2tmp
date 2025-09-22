@@ -1,579 +1,642 @@
 <!DOCTYPE html>
-<html lang="it">
+<html lang="it" data-theme="light">
 <head>
-  <meta charset="utf-8" />
-  <title>Statistiche Attività</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <link rel="icon" href="icon-192.png">
-  <meta name="theme-color" content="#2196f3">
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Statistiche</title>
 
-  <!-- Firebase (compat) -->
-  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
-  <!-- Chart.js -->
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<!-- Firebase (compat) -->
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 
-  <style>
-    body { font-family: Arial, system-ui, sans-serif; padding: 12px; }
-    input, button, select { margin: 4px; padding: 6px; font-size: 16px; }
-    table { border-collapse: collapse; width: 100%; margin-top: 12px; }
-    th, td { border: 1px solid #aaa; padding: 5px 8px; vertical-align: middle; }
-    th { background: #eee; }
-    .tag { background: #eee; border-radius: 5px; padding: 2px 7px; margin-right: 5px; }
-    .link-btn {
-      display: inline-block;
-      margin-top: 20px;
-      padding: 12px 16px;
-      background: #2196f3;
-      color: white;
-      text-align: center;
-      border-radius: 6px;
-      text-decoration: none;
-      font-weight: bold;
-    }
-    #loading { display:none; margin:8px 0; color:#555; }
-    .actions { white-space: nowrap; text-align: right; }
-    .sm { padding: 6px 10px; font-size: 14px; border: none; border-radius: 6px; background: #eaeaea; cursor: pointer; }
-    .sm + .sm { margin-left: 6px; }
-    .sm.danger { background: #ffdddd; color: #a40000; }
-    .sm.primary { background: #2196f3; color: #fff; }
+<style>
+  :root{
+    --bg:#ffffff; --text:#0b1320; --muted:#6b7280; --line:#e5e7eb; --card:#f8fafc;
+    --good:#06c167; --neutral:#6b7280; --bad:#ff2d55;
+    --good-bg:#e9fff4; --neutral-bg:#f3f4f6; --bad-bg:#ffe9ee;
+    --link:#1e88e5;
+    --chip:#eef2f7; --chipText:#334155;
+    --warn:#8b5cf6;
+  }
+  [data-theme="dark"]{
+    --bg:#0b1118; --text:#e6edf3; --muted:#94a3b8; --line:#1f2937; --card:#0f1620;
+    --good:#22d47b; --neutral:#a6adbb; --bad:#ff4d6d;
+    --good-bg:#0d2a1e; --neutral-bg:#141a23; --bad-bg:#2a0f15;
+    --link:#62a8ff;
+    --chip:#151c27; --chipText:#cdd6e1;
+    --warn:#a78bfa;
+  }
 
-    /* Grafici compatti (max 340px, centrati, altezza fissa) */
-    .chartBox {
-      width: min(340px, 92vw);
-      margin: 8px auto 12px auto;
-      position: relative;
-    }
-    .chartBox canvas {
-      width: 100% !important;
-      height: 220px !important; /* puoi ridurre a 180px se li vuoi ancora più piccoli */
-      display: block;
-    }
+  *{box-sizing:border-box}
+  body{margin:0; font-family:system-ui, -apple-system, Segoe UI, Roboto, Arial; color:var(--text); background:var(--bg)}
+  header{padding:12px 16px; border-bottom:1px solid var(--line); display:flex; align-items:center; gap:10px; flex-wrap:wrap}
+  header h1{margin:0; font-size:18px; font-weight:800}
+  .right{margin-left:auto; display:flex; gap:8px; align-items:center}
+  a.btn{background:var(--link); color:#fff; padding:8px 10px; border-radius:8px; text-decoration:none; font-size:14px}
+  .muted{color:var(--muted); font-size:12px}
+  .toggle{border:1px solid var(--line); background:transparent; color:var(--text); border-radius:8px; padding:8px 10px; cursor:pointer}
 
-    /* Overlay / modal per modifica */
-    .overlay {
-      position: fixed; inset: 0; background: rgba(0,0,0,.35);
-      display: none; align-items: center; justify-content: center; z-index: 9999;
-    }
-    .overlay.show { display: flex; }
-    .modal {
-      width: min(520px, 92vw);
-      background: #fff; border-radius: 10px; padding: 16px; box-shadow: 0 10px 30px rgba(0,0,0,.2);
-    }
-    .modal h3 { margin: 0 0 8px; }
-    .row { display: flex; gap: 8px; }
-    .row > * { flex: 1; }
-    .modal .btns { display:flex; justify-content: space-between; gap: 8px; margin-top: 8px; }
-    .btns .left, .btns .right { display:flex; gap: 8px; }
-  </style>
+  .wrap{padding:14px 16px; display:grid; gap:14px; max-width:980px; margin:0 auto}
+  .card{background:var(--card); border:1px solid var(--line); border-radius:12px; padding:12px}
+  .title{margin:0 0 4px; font-size:16px; font-weight:800; text-align:center}
+
+  .toolbar{display:flex; gap:8px; align-items:center; flex-wrap:wrap}
+  .toolbar input[type="date"], .toolbar select{
+    padding:6px 8px; border:1px solid var(--line); background:transparent; color:var(--text); border-radius:8px; font-size:14px
+  }
+  .navbtn{width:32px; height:32px; border-radius:8px; border:1px solid var(--line); background:transparent; color:var(--text); cursor:pointer; font-size:16px}
+  .gear{margin-left:auto; cursor:pointer; font-size:18px; opacity:.8}
+
+  .chartBox{width:100%; max-width:420px; margin:6px auto}
+  .chartBox canvas{width:100% !important; height:220px !important; display:block}
+  .chartBox.small canvas{height:160px !important}
+  .chartNote{ text-align:center; font-size:12px; color:var(--muted); margin-top:2px }
+
+  .chips{display:flex; gap:6px; flex-wrap:wrap; margin-top:8px; justify-content:center}
+  .chip{padding:4px 8px; border:1px solid var(--line); border-radius:999px; background:var(--chip); color:var(--chipText); font-size:12px; white-space:nowrap}
+
+  .bar{height:8px; width:100%; background:#eef2f7; border-radius:999px; overflow:hidden; margin:8px auto 0; max-width:420px}
+  [data-theme="dark"] .bar{background:#1f2732}
+  .bar > span{display:block; height:100%}
+  .bar .good{background:var(--good)}
+  .bar .neutral{background:var(--neutral)}
+  .bar .bad{background:var(--bad)}
+
+  /* Tabelle */
+  table{width:100%; border-collapse:collapse; margin-top:6px; table-layout:fixed}
+  th, td{border:1px solid var(--line); padding:6px 8px; font-size:13px; vertical-align:middle}
+  th{background:transparent; text-align:left; font-weight:700}
+  td.c{text-align:center}
+  tr.good{background:var(--good-bg)}
+  tr.neutral{background:var(--neutral-bg)}
+  tr.bad{background:var(--bad-bg)}
+
+  /* Pannello impostazioni tag */
+  .panel{display:none; padding:10px; border:1px dashed var(--line); border-radius:10px; background:transparent; margin-top:6px}
+  .panel.show{display:block}
+  .panel .row{display:flex; gap:8px; flex-wrap:wrap}
+  .panel input, .panel select, .panel button{padding:6px 8px; border:1px solid var(--line); border-radius:8px; font-size:14px; background:transparent; color:var(--text)}
+  .panel button{background:var(--text); color:var(--bg); cursor:pointer; border-color:var(--text)}
+  .maplist{margin-top:6px; display:flex; gap:6px; flex-wrap:wrap}
+  .pill{border:1px solid var(--line); border-radius:999px; padding:2px 8px; font-size:12px}
+  .cloudTitle{ margin-top:8px; font-size:12px; color:var(--muted) }
+  .cloud{ display:flex; gap:6px; flex-wrap:wrap; margin-top:6px }
+  .cloud .pill{ cursor:pointer; }
+  .pill.warn{ border-color: var(--warn); color: var(--warn); }
+
+  /* RECORDS tabella compatta */
+  .recCtrl{ display:flex; gap:6px; align-items:center; flex-wrap:wrap; margin-top:8px }
+  .recCtrl input, .recCtrl button{ padding:6px 8px; border:1px solid var(--line); border-radius:8px; font-size:14px; background:transparent; color:var(--text) }
+  .seg{ height:28px; width:1px; background:var(--line) }
+  .iconBtn{ padding:4px 8px; border:1px solid var(--line); border-radius:8px; background:transparent; color:var(--text); cursor:pointer; min-width:auto }
+  .iconBtn.save{ background:var(--good); color:#fff; border-color:var(--good) }
+  .iconBtn.del{ background:var(--bad); color:#fff; border-color:var(--bad) }
+  .k{ font-weight:700 }
+  .btn{ border:1px solid var(--line); background:transparent; color:var(--text); border-radius:8px; padding:6px 10px; cursor:pointer }
+  .btn.primary{ background:var(--link); color:#fff; border-color:var(--link) }
+  .tagCell .tag{ background:var(--chip); border-radius:10px; padding:2px 8px; display:inline-block; }
+  input.inline{ width:100%; border:1px solid var(--line); border-radius:6px; padding:4px 6px; font-size:13px; background:transparent; color:var(--text) }
+</style>
 </head>
 <body>
-  <h2>📊 Statistiche Giornaliere</h2>
-  <div id="loading">Caricamento…</div>
-  <button onclick="calcolaPercentualiPerData()">Mostra Statistiche Oggi</button>
-  Cambia data: <input type="date" id="statsDate">
-  <div>
-    <button onclick="calcolaPercentualiPerData('all')">TUTTE</button>
-    <button onclick="calcolaPercentualiPerData('free')">Solo tempo gestibile</button>
+<header>
+  <h1>Statistiche</h1>
+  <div class="right">
+    <button id="themeBtn" class="toggle" title="Tema">🌙</button>
+    <span id="userLabel" class="muted">—</span>
+    <a class="btn" href="index.html">↩︎ Inserimento</a>
   </div>
+</header>
 
-  <!-- Confronto tra due date -->
-  <div style="margin-top:8px">
-    Confronta:
-    <input type="date" id="cmpA"> vs <input type="date" id="cmpB">
-    <button id="btnCompare">Confronta</button>
-  </div>
-
-  <div id="statsResult"></div>
-  <div class="chartBox"><canvas id="statsPie"></canvas></div>
-
-  <hr>
-  <h2>🗕️ Statistiche Settimanali</h2>
-  Dal: <input type="date" id="weekStart">
-  Al: <input type="date" id="weekEnd">
-  <div>
-    <button onclick="calcolaPercentualiSettimana('all')">TUTTE</button>
-    <button onclick="calcolaPercentualiSettimana('free')">Solo tempo gestibile</button>
-  </div>
-  <div id="weekStatsResult"></div>
-  <div class="chartBox"><canvas id="weekStatsPie"></canvas></div>
-
-  <hr>
-  <h2>📋 Attività</h2>
-  <div>
-    <button id="btnLast" class="sm primary">Ultimi 5 (realtime)</button>
-    <button id="btnAll"  class="sm">Mostra tutti</button>
-  </div>
-  <table id="activityTable">
-    <thead>
-      <tr><th>Data</th><th>Ora</th><th>Tag</th><th>Attività</th><th class="actions">Azioni</th></tr>
-    </thead>
-    <tbody id="activityList"></tbody>
-  </table>
-
-  <div style="margin-top:14px">
-    <a href="index.html" class="link-btn">📥 Torna all’inserimento</a>
-  </div>
-
-  <!-- Overlay di modifica -->
-  <div id="editOverlay" class="overlay" aria-hidden="true">
-    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="editTitle">
-      <h3 id="editTitle">✏️ Modifica attività</h3>
-      <input type="text" id="editActivity" placeholder="Attività…">
+<div class="wrap">
+  <!-- CONTROLLI GIORNO -->
+  <div class="card">
+    <div class="toolbar">
+      <button id="prevDay" class="navbtn" title="Giorno precedente">‹</button>
+      <input type="date" id="dayPick">
+      <button id="nextDay" class="navbtn" title="Giorno successivo">›</button>
+      <span id="loading" class="muted">Caricamento…</span>
+      <span id="openGear" class="gear" title="Gestione categorie">⚙︎</span>
+    </div>
+    <div id="gearPanel" class="panel" aria-hidden="true">
+      <div class="muted" style="margin-bottom:6px">Mappa un tag alla sua categoria (salvato solo su questo dispositivo).</div>
       <div class="row">
-        <input type="datetime-local" id="editDateTime">
-        <select id="editTag">
-          <option value="">--Tag--</option>
-          <option>Entertainment</option>
-          <option>Survive</option>
-          <option>Study</option>
-          <option>Work</option>
-          <option>Nut</option>
-          <option>Slavery</option>
-          <option>Productivity</option>
-          <option>Waste</option>
-          <option>Chess</option>
-          <option>Gym</option>
-          <option>Bike</option>
-          <option>Holiday</option>
-          <option>Chinese</option>
-          <option>Sleep</option>
-          <option>Book</option>
+        <input id="tagName" placeholder="Tag (es. Nut)" />
+        <select id="tagCat">
+          <option value="good">Produttivo</option>
+          <option value="neutral">Neutro</option>
+          <option value="bad">Spreco</option>
+          <option value="non">Non gestibile</option>
         </select>
+        <button id="saveMap">Aggiungi/aggiorna</button>
+        <button id="resetMap" style="background:#ff2d55">Reset</button>
       </div>
-      <div class="btns">
-        <div class="left">
-          <button id="deleteEditBtn" class="sm danger">🗑️ Elimina</button>
-        </div>
-        <div class="right">
-          <button id="cancelEditBtn" class="sm">Annulla</button>
-          <button id="saveEditBtn" class="sm primary">Salva</button>
-        </div>
-      </div>
+      <div class="maplist" id="mapList"></div>
+      <div class="cloudTitle">Tag rilevati (ultimi 500 + default): clicca per precompilare</div>
+      <div class="cloud" id="tagCloud"></div>
     </div>
   </div>
 
-  <script>
-    // === Firebase init ===
-    const firebaseConfig = {
-      apiKey: "AIzaSyDEq8aUhdBPcjYM6H6909DldXAdjhRNWbI",
-      authDomain: "time-ff7ed.firebaseapp.com",
-      projectId: "time-ff7ed",
-      storageBucket: "time-ff7ed.appspot.com",
-      messagingSenderId: "842285944784",
-      appId: "1:842285944784:web:de483548153abc956033d5",
-      measurementId: "G-ZR0BNWGVXJ"
-    };
-    if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+  <!-- GIORNO -->
+  <section class="card">
+    <h2 class="title">Giorno</h2>
+    <div class="row">
+      <div class="col">
+        <div class="chartBox"><canvas id="dailyDonut"></canvas></div>
+        <div class="chartNote">Donut: % sul tempo <b>disponibile</b> oggi (escluso Non gestibile).</div>
+        <div class="chips">
+          <span class="chip">Disponibile: <b id="d_avail">—</b></span>
+          <span class="chip">Rimanente: <b id="d_remaining">—</b></span>
+          <span class="chip">Focus: <b id="d_focus">—%</b></span>
+        </div>
+        <div class="bar">
+          <span id="d_bar_good" class="good" style="width:0%"></span>
+          <span id="d_bar_neut" class="neutral" style="width:0%"></span>
+          <span id="d_bar_wast" class="bad" style="width:0%"></span>
+        </div>
+      </div>
+      <div class="col">
+        <table>
+          <thead><tr><th style="width:60%">Tag</th><th style="width:20%">Tempo</th><th style="width:20%">%</th></tr></thead>
+          <tbody id="dailyRank"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
 
-    // Offline persistence
-    firebase.firestore().enablePersistence({synchronizeTabs:true}).catch(e=>{
-      console.warn('Persistence non attiva:', e.code);
+  <!-- PERIODO -->
+  <section class="card">
+    <h2 class="title">Periodo</h2>
+    <div class="toolbar" style="justify-content:center">
+      <span class="muted">Tipo:</span>
+      <select id="perType">
+        <option value="week" selected>Settimana</option>
+        <option value="month">Mese</option>
+        <option value="year">Anno</option>
+      </select>
+      <span class="muted">Fine periodo:</span>
+      <input type="date" id="perEnd">
+      <button id="perApply" class="toggle">Applica</button>
+    </div>
+
+    <div class="row" style="margin-top:6px">
+      <div class="col">
+        <div class="chartBox small"><canvas id="perTrend"></canvas></div>
+        <div class="chartNote">Linea: X = giorni, Y = % del tempo <b>disponibile</b> per bucket.</div>
+      </div>
+      <div class="col">
+        <table>
+          <thead><tr><th style="width:60%">Tag</th><th style="width:20%">Tempo</th><th style="width:20%">%</th></tr></thead>
+          <tbody id="perRank"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- 📋 TABELLA ATTIVITÀ -->
+  <section class="card">
+    <h2 class="title">📋 Attività <span id="recCount" class="muted"></span></h2>
+    <div class="recCtrl">
+      <button id="btnLast" class="btn primary">Ultimi 5 (realtime)</button>
+      <span class="seg"></span>
+      <input type="date" id="recStart">
+      <input type="date" id="recEnd">
+      <button id="recRefresh" class="btn">Mostra</button>
+      <input id="recSearch" placeholder="Filtra testo/tag" style="margin-left:auto; min-width:180px;">
+    </div>
+    <table id="recTable">
+      <thead>
+        <tr>
+          <th style="width:16ch">Data</th>
+          <th style="width:10ch">Ora</th>
+          <th style="width:18ch">Tag</th>
+          <th>Attività</th>
+          <th style="width:12ch" class="c">Azioni</th>
+        </tr>
+      </thead>
+      <tbody id="recTbody">
+        <tr><td class="c muted" colspan="5">Nessun record.</td></tr>
+      </tbody>
+    </table>
+    <div style="display:flex; justify-content:center;">
+      <button id="loadMore" class="btn" style="margin-top:6px;">Carica altri</button>
+    </div>
+  </section>
+</div>
+
+<script>
+/* ===== Firebase init ===== */
+const firebaseConfig = {
+  apiKey: "AIzaSyDEq8aUhdBPcjYM6H6909DldXAdjhRNWbI",
+  authDomain: "time-ff7ed.firebaseapp.com",
+  projectId: "time-ff7ed",
+  storageBucket: "time-ff7ed.appspot.com",
+  messagingSenderId: "842285944784",
+  appId: "1:842285944784:web:de483548153abc956033d5",
+  measurementId: "G-ZR0BNWGVXJ"
+};
+if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const db = firebase.firestore();
+
+/* ===== Theme ===== */
+const THEME_KEY='tt_theme';
+function applyTheme(t){ document.documentElement.setAttribute('data-theme', t); localStorage.setItem(THEME_KEY, t); document.getElementById('themeBtn').textContent=(t==='dark'?'☀️':'🌙'); }
+(function(){ applyTheme(localStorage.getItem(THEME_KEY)||'light'); })();
+document.getElementById('themeBtn').addEventListener('click', ()=>{
+  const cur = document.documentElement.getAttribute('data-theme');
+  applyTheme(cur==='dark'?'light':'dark');
+});
+
+/* ===== Tag mapping (come prima) ===== */
+let NON_G = ['Sleep','Work','Survive','Slavery'];
+let GOOD  = ['Study','Productivity','Book','Chinese','Gym','Bike','Chess'];
+let NEUT  = ['Entertainment','Holiday','Nut'];
+let WAST  = ['Waste'];
+const DEFAULT_TAGS = ["Entertainment","Survive","Study","Work","Nut","Slavery","Productivity","Waste","Chess","Gym","Bike","Holiday","Chinese","Sleep","Book"];
+const LS_KEY='tt_custom_tag_map';
+function loadCustomMap(){ try{ return JSON.parse(localStorage.getItem(LS_KEY)||'{}'); }catch{ return {}; } }
+function saveCustomMap(m){ localStorage.setItem(LS_KEY, JSON.stringify(m)); }
+let customMap=loadCustomMap();
+function tagCategory(tag){
+  const t=String(tag||'').trim(); if(!t) return 'neutral';
+  const m=customMap[t]; if(m) return m;
+  if(NON_G.includes(t)) return 'non';
+  if(GOOD.includes(t))  return 'good';
+  if(NEUT.includes(t))  return 'neutral';
+  if(WAST.includes(t))  return 'bad';
+  return 'neutral';
+}
+
+/* ===== Utils ===== */
+const $ = s => document.querySelector(s);
+const dayStart = d => `${d}T00:00`;
+const dayEnd   = d => `${d}T23:59:59`;
+function todayYMD(){ const now=new Date(); const tz=-now.getTimezoneOffset(); return new Date(now.getTime()+tz*60000).toISOString().slice(0,10); }
+function addDaysYMD(ymd, d){ const [y,m,dy]=ymd.split('-').map(Number); const dt=new Date(Date.UTC(y,m-1,dy)); dt.setUTCDate(dt.getUTCDate()+d); return `${dt.getUTCFullYear()}-${String(dt.getUTCMonth()+1).padStart(2,'0')}-${String(dt.getUTCDate()).padStart(2,'0')}`; }
+function fmtHM(m){ const h=Math.floor(m/60),mm=m%60; if(h>0&&mm>0)return `${h}h ${mm}m`; if(h>0)return `${h}h`; return `${mm}m`; }
+function col(uid){ return db.collection(`users/${uid}/activities`); }
+
+/* ===== Aggregazioni (come prima) ===== */
+function buildDayEvents(items, ymd, nextFirstTag){
+  const ev=[]; if(items.length){ ev.push({tag:items[0].tag,timestamp:dayStart(ymd)}); items.forEach(it=>ev.push({tag:it.tag,timestamp:it.timestamp}));
+    const end=dayEnd(ymd); const last=items[items.length-1].timestamp;
+    ev.push({tag:(last<end? (nextFirstTag||'Sleep'): items[items.length-1].tag), timestamp:end});
+  } else { ev.push({tag:'Sleep',timestamp:dayStart(ymd)}); ev.push({tag:'Sleep',timestamp:dayEnd(ymd)}); }
+  return ev;
+}
+function minutesPerTag(events){
+  const map={}; for(let i=1;i<events.length;i++){ const t1=new Date(events[i-1].timestamp), t2=new Date(events[i].timestamp);
+    const diff=Math.round((t2-t1)/60000); if(diff<=0) continue; const tag=events[i].tag; map[tag]=(map[tag]||0)+diff; }
+  return map;
+}
+function splitBuckets(perTag){
+  let non=0,good=0,neutral=0,bad=0,ent=0;
+  for (const [tag,min] of Object.entries(perTag)){
+    const cat=tagCategory(tag);
+    if(cat==='non') non+=min; else if(cat==='good') good+=min; else if(cat==='bad') bad+=min;
+    else { if(tag==='Entertainment') ent+=min; else neutral+=min; }
+  }
+  const avail=Math.max(0,1440-non);
+  const tol=Math.round(avail*20/100); const entNeutral=Math.min(ent,tol); const entOver=Math.max(0,ent-tol);
+  neutral+=entNeutral; bad+=entOver; return {non,good,neutral,bad,avail};
+}
+function rankGest(perTag){
+  const rows=Object.entries(perTag).filter(([tag])=>tagCategory(tag)!=='non');
+  const total=rows.reduce((a,[,m])=>a+m,0); rows.sort((a,b)=>b[1]-a[1]); return {rows,total};
+}
+function percent(n,tot){ return tot>0?Math.round(100*n/tot):0; }
+
+/* ===== Charts ===== */
+let dailyDonut, perTrend;
+function destroyChart(ch){ if(ch) ch.destroy(); }
+
+/* ===== Day render ===== */
+async function fetchDay(uid, ymd){
+  const snap=await col(uid).where('timestamp','>=',dayStart(ymd)).where('timestamp','<=',dayEnd(ymd)).orderBy('timestamp').get();
+  const a=[]; snap.forEach(d=>a.push({tag:d.data().tag, timestamp:d.data().timestamp}));
+  return a;
+}
+async function renderDay(uid, ymd){
+  const items=await fetchDay(uid, ymd);
+  const next=addDaysYMD(ymd,1);
+  const nextSnap=await col(uid).where('timestamp','>=',dayStart(next)).orderBy('timestamp').limit(1).get();
+  let nextFirst=null; nextSnap.forEach(d=> nextFirst=d.data().tag);
+
+  const events=buildDayEvents(items, ymd, nextFirst);
+  const perTag=minutesPerTag(events);
+  const totals=splitBuckets(perTag);
+
+  destroyChart(dailyDonut);
+  dailyDonut=new Chart(document.getElementById('dailyDonut').getContext('2d'),{
+    type:'doughnut',
+    data:{ labels:['Produttivo','Neutro','Spreco'], datasets:[{ data:[totals.good,totals.neutral,totals.bad], backgroundColor:['#06c167','#6b7280','#ff2d55'] }]},
+    options:{ responsive:true, maintainAspectRatio:false, cutout:'60%', plugins:{legend:{position:'bottom', labels:{boxWidth:10, font:{size:11}}}}}
+  });
+
+  $('#d_avail').textContent=fmtHM(totals.avail);
+  const rem = (ymd===todayYMD()) ? Math.max(0, Math.round((new Date().setHours(23,59,59,999)-Date.now())/60000)) : null;
+  $('#d_remaining').textContent = (rem===null ? '—' : fmtHM(rem));
+  $('#d_focus').textContent=(totals.avail?Math.round(100*totals.good/totals.avail):0)+'%';
+
+  const gP=percent(totals.good,totals.avail), nP=percent(totals.neutral,totals.avail), bP=percent(totals.bad,totals.avail);
+  $('#d_bar_good').style.width=gP+'%'; $('#d_bar_neut').style.width=(gP+nP)+'%'; $('#d_bar_wast').style.width=(gP+nP+bP)+'%';
+
+  const {rows,total}=rankGest(perTag); const tbody=$('#dailyRank'); tbody.innerHTML='';
+  rows.forEach(([tag,min])=>{
+    const cat=tagCategory(tag);
+    const cls=(cat==='good'?'good':cat==='bad'?'bad':(cat==='non'?'':'neutral'));
+    const pct=percent(min,total);
+    tbody.innerHTML+=`<tr class="${cls}"><td>${tag}</td><td class="c">${fmtHM(min)}</td><td class="c">${pct}%</td></tr>`;
+  });
+}
+
+/* ===== Period render ===== */
+async function fetchRange(uid, start, end){
+  const snap=await col(uid).where('timestamp','>=',dayStart(start)).where('timestamp','<=',dayEnd(end)).orderBy('timestamp').get();
+  const a=[]; snap.forEach(d=>a.push({tag:d.data().tag,timestamp:d.data().timestamp})); return a;
+}
+async function renderPeriod(uid){
+  const type=$('#perType').value;
+  const endYmd=$('#perEnd').value||todayYMD();
+  const startYmd=(type==='week')?addDaysYMD(endYmd,-6):(type==='month'?`${endYmd.slice(0,7)}-01`:`${endYmd.slice(0,4)}-01-01`);
+  const snap=await fetchRange(uid,startYmd,endYmd);
+
+  const byDate=new Map();
+  snap.forEach(d=>{ const k=String(d.timestamp).slice(0,10); if(!byDate.has(k)) byDate.set(k,[]); byDate.get(k).push({tag:d.tag,timestamp:d.timestamp});});
+  const days=[]; for(let d=startYmd; d<=endYmd; d=addDaysYMD(d,1)) days.push(d);
+
+  const firstTag={};
+  for(const d of days){ const arr=(byDate.get(d)||[]).sort((a,b)=>a.timestamp<b.timestamp?-1:1); firstTag[d]=arr.length?arr[0].tag:null; }
+
+  const serGood=[],serNeutral=[],serBad=[], perTagAll={};
+  for(let i=0;i<days.length;i++){
+    const d=days[i]; const arr=(byDate.get(d)||[]).sort((a,b)=>a.timestamp<b.timestamp?-1:1);
+    const events=buildDayEvents(arr,d, firstTag[days[i+1]]||'Sleep');
+    const perTag=minutesPerTag(events); const t=splitBuckets(perTag);
+    serGood.push(percent(t.good,t.avail)); serNeutral.push(percent(t.neutral,t.avail)); serBad.push(percent(t.bad,t.avail));
+    for (const [tag,min] of Object.entries(perTag)){ if(tagCategory(tag)!=='non') perTagAll[tag]=(perTagAll[tag]||0)+min; }
+  }
+
+  destroyChart(perTrend);
+  perTrend=new Chart(document.getElementById('perTrend').getContext('2d'),{
+    type:'line',
+    data:{ labels:days.map((_,i)=>i+1),
+      datasets:[
+        {label:'Produttivo', data:serGood, borderColor:'#06c167', backgroundColor:'transparent', tension:.3, pointRadius:0, borderWidth:2},
+        {label:'Neutro',     data:serNeutral, borderColor:'#6b7280', backgroundColor:'transparent', tension:.3, pointRadius:0, borderWidth:2},
+        {label:'Spreco',     data:serBad, borderColor:'#ff2d55', backgroundColor:'transparent', tension:.3, pointRadius:0, borderWidth:2}
+      ]},
+    options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{ y:{ beginAtZero:true, max:100 } } }
+  });
+
+  const entries=Object.entries(perTagAll).sort((a,b)=>b[1]-a[1]);
+  const total=entries.reduce((a,[,m])=>a+m,0);
+  const tbody=$('#perRank'); tbody.innerHTML='';
+  entries.forEach(([tag,min])=>{
+    const cat=tagCategory(tag);
+    const cls=(cat==='good'?'good':cat==='bad'?'bad':(cat==='non'?'':'neutral'));
+    const pct=percent(min,total);
+    tbody.innerHTML+=`<tr class="${cls}"><td>${tag}</td><td class="c">${fmtHM(min)}</td><td class="c">${pct}%</td></tr>`;
+  });
+}
+
+/* ===== Orchestrator ===== */
+let currentUid=null;
+async function renderAll(){
+  const ymd=$('#dayPick').value;
+  $('#loading').textContent='Caricamento…';
+  await renderDay(currentUid, ymd);
+  await renderPeriod(currentUid);
+  $('#loading').textContent='Pronto';
+}
+
+/* ===== Tag cloud (mapping helper) ===== */
+async function buildTagCloud(uid){
+  const cloudEl=$('#tagCloud'); cloudEl.innerHTML=`<span class="pill muted">Scansione…</span>`;
+  const seen=new Set(DEFAULT_TAGS);
+  try{
+    const snap=await col(uid).orderBy('timestamp','desc').limit(500).get();
+    snap.forEach(doc=>{ const t=(doc.data().tag||'').trim(); if(t) seen.add(t); });
+  }catch(e){ console.warn('Tag cloud read error', e.message); }
+  const tags=Array.from(seen).sort((a,b)=>a.localeCompare(b));
+  cloudEl.innerHTML=''; if(!tags.length){ cloudEl.innerHTML=`<span class="pill muted">Nessun tag</span>`; return; }
+  tags.forEach(tag=>{
+    const mapped=customMap[tag];
+    const pill=document.createElement('span'); pill.className='pill'+(mapped?'':' warn');
+    pill.textContent=tag+(mapped?` → ${mapped}`:''); pill.title=mapped?`Mappato ${mapped}`:'Clicca per mappare';
+    pill.addEventListener('click',()=>{ $('#tagName').value=tag; $('#tagCat').focus(); });
+    cloudEl.appendChild(pill);
+  });
+}
+
+/* ===================== TABELLA ATTIVITÀ ===================== */
+function toLocalDateTimeParts(iso){
+  if(!iso) return {d:'',t:''};
+  const dt=new Date(iso);
+  const d=dt.toLocaleDateString('it-IT',{timeZone:'Europe/Rome'});
+  const t=dt.toLocaleTimeString('it-IT',{timeZone:'Europe/Rome',hour12:false});
+  return {d,t};
+}
+function toInputDT(iso){ return iso? iso.slice(0,16):''; }
+function fromInputDT(v){ return v; } // timestamp è già in ISO “YYYY-MM-DDTHH:MM”
+
+let recUnsub = null;          // realtime subscription per “Ultimi 5”
+let recLastDoc = null;        // ultimo documento paginazione
+let recHasMore = false;       // se ci sono altre pagine
+let recMode   = 'latest';     // 'latest' | 'range'
+let recRange  = {start:null, end:null};
+const PAGE_FIRST = 5;
+const PAGE_NEXT  = 10;
+
+function rowHTML(r){
+  const parts = toLocalDateTimeParts(r.timestamp);
+  return `
+    <tr data-id="${r.id}">
+      <td><input class="inline rDate" type="date" value="${(r.timestamp||'').slice(0,10)}" disabled></td>
+      <td><input class="inline rTime" type="time" value="${(r.timestamp||'').slice(11,16)}" disabled></td>
+      <td class="tagCell"><input class="inline rTag" value="${(r.tag||'').replaceAll('<','&lt;')}" disabled></td>
+      <td><input class="inline rAct" value="${(r.activity||'').replaceAll('<','&lt;')}" disabled></td>
+      <td class="c">
+        <button class="iconBtn edit" title="Modifica">✏️</button>
+        <button class="iconBtn del"  title="Elimina">🗑️</button>
+      </td>
+    </tr>`;
+}
+
+function bindTableEvents(){
+  // Ricerca live (solo sui record già in DOM)
+  $('#recSearch').addEventListener('input', ()=>{
+    const q=($('#recSearch').value||'').toLowerCase();
+    const rows=[...document.querySelectorAll('#recTbody tr')];
+    let vis=0; rows.forEach(tr=>{
+      const act=tr.querySelector('.rAct')?.value.toLowerCase()||'';
+      const tag=tr.querySelector('.rTag')?.value.toLowerCase()||'';
+      const show=!q || act.includes(q) || tag.includes(q);
+      tr.style.display=show?'':'none'; if(show) vis++;
     });
+    $('#recCount').textContent = vis ? `(${vis}${recHasMore?'+':''})` : '(0)';
+  });
 
-    const auth = firebase.auth();
-    const db   = firebase.firestore();
+  // Click su Azioni
+  $('#recTbody').addEventListener('click', async (e)=>{
+    const btn=e.target.closest('button'); if(!btn) return;
+    const tr=e.target.closest('tr'); const id=tr?.dataset?.id; if(!id) return;
 
-    // === Stato ===
-    const NON_LIBERI = ["Survive", "Sleep", "Work", "Slavery"];
-    let statsPieChart = null, weekPieChart = null;
-    let unsubLatest = null; // realtime ultimi 5
-    let currentEditId = null;
-
-    // Helpers
-    const isoDayStart = d => `${d}T00:00:00`;
-    const isoDayEnd   = d => `${d}T23:59:59`;
-    const $ = s => document.querySelector(s);
-    const loadingEl = $('#loading');
-    function setLoading(on){ loadingEl.style.display = on ? 'block' : 'none'; }
-    function userActivities(uid){ return db.collection(`users/${uid}/activities`); }
-    function toInputDateTimeLocal(str){
-      if (!str) return '';
-      return str.length >= 16 ? str.slice(0,16) : str;
+    if(btn.classList.contains('edit')){
+      const saving=btn.classList.contains('save');
+      if(!saving){
+        toggleEdit(tr,true);
+      }else{
+        try{
+          const y=tr.querySelector('.rDate').value;
+          const hh=tr.querySelector('.rTime').value;
+          const activity=tr.querySelector('.rAct').value.trim();
+          const tag=tr.querySelector('.rTag').value.trim();
+          const ts = `${y}T${hh}`;
+          await col(currentUid).doc(id).update({ activity, tag, timestamp: ts });
+          toggleEdit(tr,false);
+          btn.classList.remove('save');
+        }catch(err){ alert('Errore salvataggio: '+err.message); }
+      }
+    } else if(btn.classList.contains('del')){
+      if(!confirm('Eliminare definitivamente questo record?')) return;
+      try{
+        await col(currentUid).doc(id).delete();
+        tr.remove();
+        if(!document.querySelector('#recTbody tr')){
+          $('#recTbody').innerHTML = `<tr><td class="c muted" colspan="5">Nessun record.</td></tr>`;
+        }
+        // aggiorna contatore approssimato
+        const cur = parseInt(($('#recCount').textContent.match(/\d+/)||[0])[0],10)||1;
+        $('#recCount').textContent = `(${Math.max(0,cur-1)}${recHasMore?'+':''})`;
+      }catch(err){ alert('Errore eliminazione: '+err.message); }
     }
+  });
 
-    // === Auth guard + bootstrap ===
-    document.addEventListener('DOMContentLoaded', () => {
-      auth.onAuthStateChanged(u => {
-        if (!u) { location.href = 'index.html'; return; }
-
-        // Precompila date input (oggi e settimana corrente)
-        const today = new Date().toISOString().slice(0,10);
-        if (!$('#statsDate').value) $('#statsDate').value = today;
-
-        const now = new Date();
-        const day = now.getDay();
-        const diffToMon = (day + 6) % 7;
-        const monday = new Date(now); monday.setDate(now.getDate() - diffToMon);
-        const sunday = new Date(monday); sunday.setDate(monday.getDate() + 6);
-        if (!$('#weekStart').value) $('#weekStart').value = monday.toISOString().slice(0,10);
-        if (!$('#weekEnd').value)   $('#weekEnd').value   = sunday.toISOString().slice(0,10);
-
-        // Tabella: default ultimi 5 (realtime)
-        renderActivitiesTable(u.uid, 'latest');
-
-        // Bottoni lista
-        $('#btnLast').onclick = () => renderActivitiesTable(u.uid, 'latest');
-        $('#btnAll').onclick  = () => renderActivitiesTable(u.uid, 'all');
-
-        // Confronto date
-        $('#btnCompare').onclick = () => compareTwoDays(u.uid);
-
-        // Overlay buttons
-        $('#cancelEditBtn').onclick = closeEdit;
-        $('#saveEditBtn').onclick   = saveEdit;
-        $('#deleteEditBtn').onclick = () => { if (currentEditId) deleteActivity(currentEditId); };
-        $('#editOverlay').addEventListener('click', (e)=>{
-          if (e.target.id === 'editOverlay') closeEdit();
-        });
-      });
+  // Carica altri
+  $('#loadMore').addEventListener('click', async ()=>{
+    if(recMode!=='range' || !recHasMore) return;
+    const {rows,lastDoc,size} = await fetchPage(recRange.start, recRange.end, recLastDoc, PAGE_NEXT);
+    if(!size){ recHasMore=false; $('#loadMore').disabled=true; return; }
+    const body=$('#recTbody');
+    rows.forEach(r=>{
+      const temp=document.createElement('tbody'); temp.innerHTML=rowHTML(r); body.appendChild(temp.firstElementChild);
     });
+    recLastDoc=lastDoc; recHasMore=!!lastDoc; $('#loadMore').disabled=!recHasMore;
+    const cur = parseInt(($('#recCount').textContent.match(/\d+/)||[0])[0],10)||0;
+    $('#recCount').textContent = `(${cur + size}${recHasMore?'+':''})`;
+  });
+}
 
-    // === Tabella: Ultimi 5 (realtime) / Tutti (one-shot) con azioni ===
-    function renderActivitiesTable(uid, mode='latest') {
-      if (unsubLatest) { unsubLatest(); unsubLatest = null; }
+function toggleEdit(tr, on){
+  ['.rDate','.rTime','.rTag','.rAct'].forEach(sel=>{ tr.querySelector(sel).disabled=!on; });
+  const btn=tr.querySelector('.edit'); btn.textContent=on?'💾':'✏️'; btn.classList.toggle('save', on); btn.title=on?'Salva':'Modifica';
+}
 
-      let q = userActivities(uid).orderBy("timestamp","desc");
-      if (mode === 'latest') q = q.limit(5);
+function setTableLoading(){ $('#recTbody').innerHTML = `<tr><td class="c muted" colspan="5">Caricamento…</td></tr>`; }
 
-      const updateDOM = (snapshot) => {
-        const activityList = $('#activityList');
-        activityList.innerHTML = '';
-        snapshot.forEach(doc => {
-          const d = doc.data();
-          const dt = new Date(d.timestamp);
-          const localDate = dt.toLocaleDateString('it-IT', { timeZone: 'Europe/Rome' });
-          const localTime = dt.toLocaleTimeString('it-IT', { timeZone: 'Europe/Rome', hour12: false });
-          activityList.innerHTML += `
-            <tr>
-              <td>${localDate}</td>
-              <td>${localTime}</td>
-              <td><span class="tag">${d.tag || 'Nessun tag'}</span></td>
-              <td>${d.activity || ''}</td>
-              <td class="actions">
-                <button class="sm" onclick="openEdit('${doc.id}')">✏️</button>
-                <button class="sm danger" onclick="deleteActivity('${doc.id}')">🗑️</button>
-              </td>
-            </tr>`;
-        });
-      };
+async function fetchPage(startYmd, endYmd, afterDoc, size){
+  let q = col(currentUid)
+    .where('timestamp','>=', dayStart(startYmd))
+    .where('timestamp','<=', dayEnd(endYmd))
+    .orderBy('timestamp','desc')
+    .limit(size);
+  if(afterDoc) q=q.startAfter(afterDoc);
+  const snap=await q.get(); const out=[];
+  snap.forEach(doc=>{ const d=doc.data(); out.push({id:doc.id, activity:d.activity||'', tag:d.tag||'', timestamp:d.timestamp||''});});
+  const last=snap.docs[snap.docs.length-1]||null;
+  return {rows:out,lastDoc:last,size:snap.size};
+}
 
-      if (mode === 'latest') {
-        unsubLatest = q.onSnapshot(updateDOM);
-      } else {
-        q.get().then(updateDOM);
-      }
-    }
+/* --- Modalità “Ultimi 5 (realtime)” --- */
+function showLatestRealtime(){
+  recMode='latest'; $('#loadMore').disabled=true;
+  if(recUnsub){ recUnsub(); recUnsub=null; }
+  setTableLoading();
+  const q = col(currentUid).orderBy('timestamp','desc').limit(5);
+  recUnsub = q.onSnapshot(snap=>{
+    const body=$('#recTbody'); body.innerHTML='';
+    let count=0;
+    snap.forEach(doc=>{
+      const d=doc.data(); count++;
+      const row = rowHTML({id:doc.id, activity:d.activity||'', tag:d.tag||'', timestamp:d.timestamp||''});
+      const tmp=document.createElement('tbody'); tmp.innerHTML=row; body.appendChild(tmp.firstElementChild);
+    });
+    $('#recCount').textContent = `(${count})`;
+  });
+}
 
-    // === Apertura overlay modifica ===
-    async function openEdit(id){
-      const u = auth.currentUser; if (!u) return;
-      currentEditId = id;
-      try {
-        const snap = await userActivities(u.uid).doc(id).get();
-        if (!snap.exists) { alert('Documento inesistente.'); return; }
-        const d = snap.data();
-        $('#editActivity').value = d.activity || '';
-        $('#editTag').value      = d.tag || '';
-        $('#editDateTime').value = toInputDateTimeLocal(d.timestamp || '');
-        $('#editOverlay').classList.add('show');
-        $('#editOverlay').setAttribute('aria-hidden', 'false');
-      } catch(e){ console.error(e); alert('Errore apertura modifica: '+e.message); }
-    }
-    function closeEdit(){
-      currentEditId = null;
-      $('#editOverlay').classList.remove('show');
-      $('#editOverlay').setAttribute('aria-hidden', 'true');
-    }
+/* --- Modalità “Range + paging” --- */
+async function showRange(){
+  recMode='range'; if(recUnsub){ recUnsub(); recUnsub=null; }
+  const start=$('#recStart').value || todayYMD();
+  const end  =$('#recEnd').value   || $('#recStart').value || todayYMD();
+  recRange={start,end}; recLastDoc=null; recHasMore=false;
+  setTableLoading();
+  const {rows,lastDoc,size}=await fetchPage(start,end,null,PAGE_FIRST);
+  const body=$('#recTbody');
+  if(!size){ body.innerHTML = `<tr><td class="c muted" colspan="5">Nessun record.</td></tr>`; $('#recCount').textContent='(0)'; $('#loadMore').disabled=true; return; }
+  body.innerHTML = rows.map(rowHTML).join('');
+  recLastDoc=lastDoc; recHasMore=!!lastDoc; $('#loadMore').disabled=!recHasMore;
+  $('#recCount').textContent = `(${size}${recHasMore?'+':''})`;
+}
 
-    // === Salvataggio modifica ===
-    async function saveEdit(){
-      const u = auth.currentUser; if (!u) return;
-      if (!currentEditId) return;
-      const activity = $('#editActivity').value.trim();
-      const tag      = $('#editTag').value;
-      const ts       = $('#editDateTime').value;
-      if (!activity || !tag || !ts) { alert('Compila attività, tag e data/ora.'); return; }
-      try {
-        await userActivities(u.uid).doc(currentEditId).update({ activity, tag, timestamp: ts });
-        closeEdit();
-      } catch(e){ console.error(e); alert('Errore salvataggio: '+e.message); }
-    }
+/* ===== Boot ===== */
+document.addEventListener('DOMContentLoaded', ()=>{
+  const t=todayYMD(); $('#dayPick').value=t; $('#perEnd').value=t; $('#recStart').value=t; $('#recEnd').value=t;
 
-    // === Cancellazione record (da tabella o overlay) ===
-    async function deleteActivity(id){
-      const u = auth.currentUser; if (!u) return;
-      if (!confirm('Eliminare definitivamente questa attività?')) return;
-      try {
-        await userActivities(u.uid).doc(id).delete();
-        if (id === currentEditId) closeEdit();
-      } catch(e){ console.error(e); alert('Errore eliminazione: '+e.message); }
-    }
-    window.openEdit = openEdit;
-    window.deleteActivity = deleteActivity;
+  auth.onAuthStateChanged(async u=>{
+    if(!u){ location.href='index.html'; return; }
+    currentUid=u.uid; $('#userLabel').textContent=u.email||u.uid;
+    await renderAll();
+    buildTagCloud(currentUid);
+    showLatestRealtime(); // default
+  });
 
-    // === Statistiche giornaliere ===
-    async function calcolaPercentualiPerData(filtro = "all") {
-      const u = auth.currentUser;
-      if (!u) { location.href = 'index.html'; return; }
+  // navigazione giorno
+  $('#prevDay').addEventListener('click', ()=>{ $('#dayPick').value=addDaysYMD($('#dayPick').value,-1); renderAll(); });
+  $('#nextDay').addEventListener('click', ()=>{ $('#dayPick').value=addDaysYMD($('#dayPick').value, 1); renderAll(); });
+  $('#dayPick').addEventListener('change', renderAll);
 
-      let dataYYYYMMDD = $('#statsDate').value || new Date().toISOString().slice(0,10);
-      $('#statsDate').value = dataYYYYMMDD;
+  // periodo
+  $('#perApply').addEventListener('click', ()=> renderPeriod(currentUid));
 
-      setLoading(true);
-      const snap = await userActivities(u.uid)
-        .where("timestamp", ">=", isoDayStart(dataYYYYMMDD))
-        .where("timestamp", "<=", isoDayEnd(dataYYYYMMDD))
-        .orderBy("timestamp").get();
+  // gear panel
+  const renderMapList = ()=>{
+    const box=$('#mapList'); box.innerHTML='';
+    const entries=Object.entries(customMap);
+    if(!entries.length){ box.innerHTML=`<span class="pill muted">Nessuna mappatura</span>`; return; }
+    entries.forEach(([tag,cat])=>{
+      const color = cat==='good'?'var(--good)':cat==='bad'?'var(--bad)':cat==='non'?'var(--warn)':'var(--neutral)';
+      box.innerHTML += `<span class="pill" style="border-color:${color}; color:${color}">${tag} → ${cat}</span>`;
+    });
+  };
+  renderMapList();
+  $('#openGear').addEventListener('click', ()=>{
+    const p=$('#gearPanel'); const open=!p.classList.contains('show');
+    p.classList.toggle('show', open); p.setAttribute('aria-hidden', open?'false':'true');
+    if(open) buildTagCloud(currentUid);
+  });
+  $('#saveMap').addEventListener('click', ()=>{
+    const name=String($('#tagName').value||'').trim(); if(!name) return;
+    const cat=$('#tagCat').value; customMap[name]=cat; saveCustomMap(customMap);
+    $('#tagName').value=''; renderMapList(); renderAll(); buildTagCloud(currentUid);
+  });
+  $('#resetMap').addEventListener('click', ()=>{
+    if(!confirm('Cancellare tutte le mappature personalizzate?')) return;
+    customMap={}; saveCustomMap(customMap); renderMapList(); renderAll(); buildTagCloud(currentUid);
+  });
 
-      const items = [];
-      snap.forEach(doc => items.push({ tag: doc.data().tag, timestamp: doc.data().timestamp }));
-
-      // Prima attività del giorno successivo
-      const d = new Date(dataYYYYMMDD); d.setDate(d.getDate() + 1);
-      const nextDay = d.toISOString().slice(0,10);
-      const nextSnap = await userActivities(u.uid)
-        .where("timestamp", ">=", isoDayStart(nextDay))
-        .orderBy("timestamp").limit(1).get();
-      let nextDayActivity = null; nextSnap.forEach(doc => nextDayActivity = doc.data());
-
-      let events = [];
-      if (items.length > 0) {
-        events.push({ tag: items[0].tag, timestamp: isoDayStart(dataYYYYMMDD) });
-        events = events.concat(items);
-        const lastTime = items[items.length-1].timestamp;
-        const end = isoDayEnd(dataYYYYMMDD);
-        if (lastTime < end) events.push({ tag: nextDayActivity ? nextDayActivity.tag : "Sleep", timestamp: end });
-        else events.push({ tag: items[items.length-1].tag, timestamp: end });
-      }
-
-      if (events.length < 2) {
-        document.getElementById('statsResult').innerHTML = `<b>Statistiche del ${dataYYYYMMDD}</b><br>Nessuna attività trovata.`;
-        if (statsPieChart) { statsPieChart.destroy(); statsPieChart = null; }
-        setLoading(false);
-        return;
-      }
-
-      let tempoPerTag = {}, totMin = 0, minNonGestibili = 0, breakdown = {};
-      for (let i = 1; i < events.length; i++) {
-        const t1 = new Date(events[i-1].timestamp);
-        const t2 = new Date(events[i].timestamp);
-        const diff = Math.round((t2 - t1) / 60000);
-        if (diff <= 0) continue;
-        const tag = events[i].tag;
-        if (NON_LIBERI.includes(tag)) { minNonGestibili += diff; breakdown[tag] = (breakdown[tag] || 0) + diff; }
-        if (!(filtro === "free" && NON_LIBERI.includes(tag))) { tempoPerTag[tag] = (tempoPerTag[tag] || 0) + diff; totMin += diff; }
-      }
-
-      let html = `<b>Statistiche del ${dataYYYYMMDD} (${filtro === 'free' ? 'solo tempo gestibile' : 'tutte le attività'})</b><br>`;
-      html += `(Totale: <b>${totMin} min</b> = ${(totMin/60).toFixed(1)}h)<br>`;
-      if (filtro === "free") {
-        const disponibili = 1440 - minNonGestibili;
-        const perc = disponibili > 0 ? ((totMin / disponibili) * 100).toFixed(1) : '0.0';
-        html += `<i>Usato: ${totMin} / ${disponibili} min → <b>${perc}%</b></i><br>`;
-      }
-      html += `<br><b>🕒 Breakdown 24h (non gestibile):</b><ul>`;
-      let totaleNG = 0;
-      for (const tag of NON_LIBERI) {
-        if (breakdown[tag]) { totaleNG += breakdown[tag]; html += `<li>${tag}: ${(breakdown[tag]/60).toFixed(1)}h</li>`; }
-      }
-      html += `<li><b>Totale non gestibile:</b> ${(totaleNG/60).toFixed(1)}h</li>`;
-      html += `<li><b>Tempo teorico gestibile:</b> ${((1440 - totaleNG)/60).toFixed(1)}h</li>`;
-      html += `</ul>`;
-
-      html += `<table><tr><th>Tag</th><th>Minuti</th><th>%</th></tr>`;
-      for (const [tag, min] of Object.entries(tempoPerTag)) {
-        const perc = totMin > 0 ? ((min / totMin) * 100).toFixed(1) : '0.0';
-        html += `<tr><td>${tag}</td><td>${min}</td><td>${perc}%</td></tr>`;
-      }
-      html += `</table>`;
-      document.getElementById('statsResult').innerHTML = html;
-
-      const ctx = document.getElementById('statsPie').getContext('2d');
-      if (statsPieChart) statsPieChart.destroy();
-      statsPieChart = new Chart(ctx, {
-        type: 'pie',
-        data: { labels: Object.keys(tempoPerTag), datasets: [{ data: Object.values(tempoPerTag) }] },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false, /* usa altezza fissa CSS */
-          layout: { padding: 0 },
-          plugins: {
-            legend: { display: true, position: 'bottom', labels: { boxWidth: 10, font: { size: 11 } } }
-          }
-        }
-      });
-
-      setLoading(false);
-    }
-    window.calcolaPercentualiPerData = calcolaPercentualiPerData;
-
-    // === Statistiche settimanali ===
-    async function calcolaPercentualiSettimana(filtro = "all") {
-      const u = auth.currentUser;
-      if (!u) { location.href = 'index.html'; return; }
-
-      let start = $('#weekStart').value;
-      let end   = $('#weekEnd').value;
-
-      if (!start || !end) {
-        const now = new Date();
-        const day = now.getDay();
-        const diffToMon = (day + 6) % 7;
-        const monday = new Date(now); monday.setDate(now.getDate() - diffToMon);
-        const sunday = new Date(monday); sunday.setDate(monday.getDate() + 6);
-        start = monday.toISOString().slice(0,10);
-        end   = sunday.toISOString().slice(0,10);
-        if (!$('#weekStart').value) $('#weekStart').value = start;
-        if (!$('#weekEnd').value)   $('#weekEnd').value   = end;
-      }
-
-      async function computeDay(yyyyMmDd) {
-        const snap = await userActivities(u.uid)
-          .where("timestamp", ">=", isoDayStart(yyyyMmDd))
-          .where("timestamp", "<=", isoDayEnd(yyyyMmDd))
-          .orderBy("timestamp").get();
-
-        const items = []; snap.forEach(doc => items.push({ tag: doc.data().tag, timestamp: doc.data().timestamp }));
-        if (items.length === 0) return { tempoPerTag: {}, totMin: 0, breakdown: {}, minNonGestibili: 0 };
-
-        const d = new Date(yyyyMmDd); d.setDate(d.getDate() + 1);
-        const nextDay = d.toISOString().slice(0,10);
-        const nextSnap = await userActivities(u.uid)
-          .where("timestamp", ">=", isoDayStart(nextDay))
-          .orderBy("timestamp").limit(1).get();
-        let nextDayActivity = null; nextSnap.forEach(doc => nextDayActivity = doc.data());
-
-        let events = [{ tag: items[0].tag, timestamp: isoDayStart(yyyyMmDd) }, ...items];
-        const endStr = isoDayEnd(yyyyMmDd);
-        const lastTime = items[items.length - 1].timestamp;
-        if (lastTime < endStr) events.push({ tag: nextDayActivity ? nextDayActivity.tag : "Sleep", timestamp: endStr });
-        else events.push({ tag: items[items.length - 1].tag, timestamp: endStr });
-
-        let tempoPerTag = {}, totMin = 0, minNonGestibili = 0, breakdown = {};
-        for (let i=1; i<events.length; i++) {
-          const t1 = new Date(events[i-1].timestamp);
-          const t2 = new Date(events[i].timestamp);
-          const diff = Math.round((t2 - t1) / 60000);
-          if (diff <= 0) continue;
-          const tag = events[i].tag;
-
-          if (NON_LIBERI.includes(tag)) { minNonGestibili += diff; breakdown[tag] = (breakdown[tag] || 0) + diff; }
-          if (!(filtro === "free" && NON_LIBERI.includes(tag))) { tempoPerTag[tag] = (tempoPerTag[tag] || 0) + diff; totMin += diff; }
-        }
-        return { tempoPerTag, totMin, breakdown, minNonGestibili };
-      }
-
-      setLoading(true);
-      // Giorni inclusivi
-      const days = [];
-      { const s = new Date(start), e = new Date(end);
-        for (let d = new Date(s); d <= e; d.setDate(d.getDate()+1)) days.push(d.toISOString().slice(0,10));
-      }
-
-      let aggTempo = {}, aggTot = 0, aggBreak = {}, aggNG = 0;
-      for (const dstr of days) {
-        const res = await computeDay(dstr);
-        aggTot += res.totMin; aggNG += res.minNonGestibili;
-        for (const [tag, min] of Object.entries(res.tempoPerTag)) aggTempo[tag] = (aggTempo[tag] || 0) + min;
-        for (const [tag, min] of Object.entries(res.breakdown))   aggBreak[tag] = (aggBreak[tag] || 0) + min;
-      }
-
-      let html = `<b>Statistiche Settimanali ${start} → ${end} (${filtro === 'free' ? 'solo tempo gestibile' : 'tutte'})</b><br>`;
-      html += `(Totale: <b>${aggTot} min</b> = ${(aggTot/60).toFixed(1)}h)<br>`;
-      if (filtro === "free") {
-        const disponibili = (days.length * 1440) - aggNG;
-        const perc = disponibili > 0 ? ((aggTot / disponibili) * 100).toFixed(1) : '0.0';
-        html += `<i>Usato: ${aggTot} / ${disponibili} min → <b>${perc}%</b></i><br>`;
-      }
-      html += `<br><b>🕒 Breakdown non gestibile (settimana):</b><ul>`;
-      let totNGh = 0;
-      for (const tag of NON_LIBERI) {
-        if (aggBreak[tag]) { totNGh += aggBreak[tag]; html += `<li>${tag}: ${(aggBreak[tag]/60).toFixed(1)}h</li>`; }
-      }
-      html += `<li><b>Totale non gestibile:</b> ${(totNGh/60).toFixed(1)}h</li>`;
-      html += `</ul>`;
-
-      html += `<table><tr><th>Tag</th><th>Minuti</th><th>%</th></tr>`;
-      const total = Object.values(aggTempo).reduce((a,b)=>a+b,0);
-      for (const [tag, min] of Object.entries(aggTempo)) {
-        const perc = total > 0 ? ((min / total) * 100).toFixed(1) : '0.0';
-        html += `<tr><td>${tag}</td><td>${min}</td><td>${perc}%</td></tr>`;
-      }
-      html += `</table>`;
-      document.getElementById('weekStatsResult').innerHTML = html;
-
-      const ctx = document.getElementById('weekStatsPie').getContext('2d');
-      if (weekPieChart) weekPieChart.destroy();
-      weekPieChart = new Chart(ctx, {
-        type: 'pie',
-        data: { labels: Object.keys(aggTempo), datasets: [{ data: Object.values(aggTempo) }] },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false, /* altezza fissa via CSS */
-          layout: { padding: 0 },
-          plugins: {
-            legend: { display: true, position: 'bottom', labels: { boxWidth: 10, font: { size: 11 } } }
-          }
-        }
-      });
-
-      setLoading(false);
-    }
-    window.calcolaPercentualiSettimana = calcolaPercentualiSettimana;
-
-    // === Confronto tra due date (grafico barre su canvas principale) ===
-    async function compareTwoDays(uid){
-      const A = document.getElementById('cmpA').value, B = document.getElementById('cmpB').value;
-      if (!A || !B) { alert('Seleziona entrambe le date'); return; }
-
-      async function dayAgg(yyyyMmDd){
-        const snap = await userActivities(uid)
-          .where('timestamp','>=',isoDayStart(yyyyMmDd))
-          .where('timestamp','<=',isoDayEnd(yyyyMmDd))
-          .orderBy('timestamp').get();
-        const items=[]; snap.forEach(d=>items.push(d.data()));
-        if (!items.length) return {};
-        const ev=[{tag:items[0].tag,timestamp:isoDayStart(yyyyMmDd)},...items,{tag:items[items.length-1].tag,timestamp:isoDayEnd(yyyyMmDd)}];
-        const out={}; for (let i=1;i<ev.length;i++){ const diff=(new Date(ev[i].timestamp)-new Date(ev[i-1].timestamp))/60000; if(diff>0) out[ev[i].tag]=(out[ev[i].tag]||0)+diff; }
-        return out;
-      }
-
-      setLoading(true);
-      const aggA = await dayAgg(A);
-      const aggB = await dayAgg(B);
-      const labels = Array.from(new Set([...Object.keys(aggA),...Object.keys(aggB)]));
-
-      const ctx = document.getElementById('statsPie').getContext('2d');
-      if (statsPieChart) statsPieChart.destroy();
-      statsPieChart = new Chart(ctx, {
-        type: 'bar',
-        data: {
-          labels,
-          datasets: [
-            { label: A, data: labels.map(l=>aggA[l]||0) },
-            { label: B, data: labels.map(l=>aggB[l]||0) }
-          ]
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false, /* altezza fissa via CSS */
-          layout: { padding: 0 },
-          plugins: { legend: { position: 'bottom', labels: { font: { size: 11 } } } },
-          scales: { y: { beginAtZero: true } }
-        }
-      });
-      setLoading(false);
-    }
-
-    // === Service Worker ===
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('service-worker.js')
-        .then(() => console.log('✅ Service Worker registrato'))
-        .catch(err => console.error('❌ SW errore:', err));
-    }
-  </script>
+  // tabella attività
+  bindTableEvents();
+  $('#btnLast').addEventListener('click', showLatestRealtime);
+  $('#recRefresh').addEventListener('click', showRange);
+});
+</script>
 </body>
 </html>
