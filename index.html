@@ -8,125 +8,132 @@
   <link rel="icon" href="icon-192.png">
   <meta name="theme-color" content="#2196f3">
 
+  <!-- Pre-init TEMA: evita flash errato -->
+  <script>
+    (function(){
+      const KEY='tt_theme';
+      const saved = localStorage.getItem(KEY);
+      const prefDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+      const theme = saved || (prefDark ? 'dark' : 'light');
+      document.documentElement.setAttribute('data-theme', theme);
+    })();
+  </script>
+
   <!-- Firebase (compat) -->
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 
   <style>
-    :root{
-      --primary:#2196f3;
-      --muted:#666;
-      --border:#ddd;
-      --bg:#fff;
-      --text:#111;
-      --card:#fff;
+    /* ===== Theme Vars ===== */
+    :root[data-theme="light"]{
+      --bg:#ffffff; --text:#111; --muted:#666; --card:#ffffff; --border:#ddd;
+      --primary:#2196f3; --toast:#323232; --toastText:#fff;
+      --chip-bg:rgba(0,0,0,.06); --chip-text:#333;
     }
-    /* Dark auto (se l’OS è scuro) */
-    @media (prefers-color-scheme: dark){
-      :root{ --bg:#121212; --text:#eaeaea; --card:#1a1a1a; --border:#2a2a2a; --muted:#aaa; }
+    :root[data-theme="dark"]{
+      --bg:#121212; --text:#eaeaea; --muted:#aaa; --card:#1a1a1a; --border:#2a2a2a;
+      --primary:#2196f3; --toast:#222; --toastText:#eaeaea;
+      --chip-bg:rgba(255,255,255,.10); --chip-text:#ddd;
     }
 
     *{ box-sizing:border-box; -webkit-tap-highlight-color: transparent; }
     html, body { height: 100%; }
     body {
-      margin: 0; padding: 12px;
+      margin:0; padding:12px;
       font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial;
       color: var(--text); background: var(--bg);
-      overflow-x: hidden;  /* evita sbordi a destra */
+      overflow-x: hidden;
       padding-left: max(12px, env(safe-area-inset-left));
       padding-right: max(12px, env(safe-area-inset-right));
     }
-
     .container{ width:100%; max-width:760px; margin:0 auto; }
 
     input, select, button {
-      width: 100%; padding: 12px; margin: 6px 0; font-size: 16px;
+      width:100%; padding:12px; margin:6px 0; font-size:16px;
       border:1px solid var(--border); border-radius:10px; background:transparent; color:var(--text);
     }
-    button { cursor: pointer; }
+    button{ cursor:pointer; }
 
-    .card {
-      border:1px solid var(--border);
-      border-radius:12px;
+    .card{
+      background:var(--card); border:1px solid var(--border); border-radius:12px;
       padding:12px; margin:12px 0;
-      background: var(--card);
     }
-    .muted { color:var(--muted); font-size:14px; }
-    .hidden { display:none !important; }
+    .muted{ color:var(--muted); font-size:14px; }
+    .hidden{ display:none !important; }
 
-    /* Righe responsive senza sbordi */
-    .row { display:flex; flex-wrap:wrap; gap:8px; }
-    .row > * { flex: 1 1 240px; min-width: 0; } /* min-width:0 evita overflow di input lunghi */
-    /* Su schermi molto stretti, ogni elemento prende la sua riga */
-    @media (max-width: 420px){
-      .row > * { flex-basis: 100%; }
+    .row{ display:flex; flex-wrap:wrap; gap:8px; }
+    .row > *{ flex:1 1 240px; min-width:0; }
+    @media (max-width:420px){ .row > *{ flex-basis:100%; } }
+
+    /* Aggiungi (centrato, grande) */
+    .addWrap{ display:flex; justify-content:center; }
+    #addBtn{
+      width:min(560px,100%); min-height:52px; border:none; border-radius:12px;
+      background:var(--primary); color:#fff; font-weight:700;
     }
 
-    /* Link/pulsanti azione principali */
-    .link {
+    /* Pulsante link principale */
+    .link{
       background:var(--primary); color:#fff; border:none; border-radius:10px;
       margin-top:16px; font-weight:bold; width:100%; min-height:48px;
     }
 
-    /* Bottone Aggiungi centrato e thumb-friendly */
-    .addWrap { display:flex; justify-content:center; }
-    #addBtn {
-      width: min(560px, 100%);
-      min-height: 52px;
-      background: var(--primary);
-      border: none; color:#fff; font-weight:700;
-      border-radius: 12px;
+    /* Tools in alto a destra: tema + chip utente */
+    .top-tools{
+      position:fixed; top:8px; right:8px; z-index:1000;
+      display:flex; gap:8px; align-items:center;
+    }
+    .icon-btn{
+      min-width:40px; min-height:40px;
+      display:inline-flex; align-items:center; justify-content:center;
+      border:1px solid var(--border); border-radius:999px;
+      background:var(--card); color:var(--text); font-size:18px; cursor:pointer;
+      box-shadow:0 2px 8px rgba(0,0,0,.06);
     }
 
-    /* Chip utente minimale (nickname + logout emoji) */
-    .statuschip {
-      position: fixed; top: 8px; right: 8px;
-      display: none; align-items: center; gap: 8px;
-      background: rgba(0,0,0,.06); color:#333;
-      padding: 6px 12px; border-radius: 999px;
-      font-size: 13px; line-height: 1; opacity: .65;
-      transition: opacity .2s, transform .2s;
-      z-index: 1000;
+    .statuschip{
+      display:none; align-items:center; gap:8px;
+      background: var(--chip-bg); color: var(--chip-text);
+      padding: 6px 12px; border-radius: 999px; font-size:13px; line-height:1;
       box-shadow: 0 2px 8px rgba(0,0,0,.08);
     }
-    .statuschip.show { display: inline-flex; }
-    .statuschip:hover { opacity: 1; }
-    .who { cursor: pointer; user-select: none; }
-    .icon-btn { background: transparent; border: none; padding: 0 2px; margin: 0; font-size: 16px; line-height: 1; cursor: pointer; opacity: .9; }
+    .statuschip.show{ display:inline-flex; }
+    .who{ cursor:pointer; user-select:none; }
+    #logoutBtn{ border:none; background:transparent; font-size:16px; line-height:1; cursor:pointer; }
 
-    /* Popover nickname (locale) */
-    .nickpop {
-      position: fixed; top: 48px; right: 8px;
-      display: none; width: min(320px, 92vw);
-      background: var(--card); border: 1px solid var(--border); border-radius: 12px;
-      box-shadow: 0 10px 30px rgba(0,0,0,.18); padding: 12px;
-      z-index: 1001;
+    /* Nick popover */
+    .nickpop{
+      position:fixed; top:56px; right:8px; z-index:1001;
+      display:none; width:min(320px,92vw);
+      background:var(--card); color:var(--text);
+      border:1px solid var(--border); border-radius:12px; padding:12px;
+      box-shadow:0 10px 30px rgba(0,0,0,.18);
     }
-    .nickpop.show { display: block; }
-    .sm { width:auto; padding: 10px 14px; border:none; border-radius:10px; background:#eaeaea; cursor:pointer; }
-    .sm.primary { background: var(--primary); color: #fff; }
-    .sm.ghost { background:#f1f1f1; color:#333; }
+    .nickpop.show{ display:block; }
+    .sm{ width:auto; padding:10px 14px; border:none; border-radius:10px; background:#eaeaea; color:#111; cursor:pointer; }
+    :root[data-theme="dark"] .sm{ background:#2a2a2a; color:#eaeaea; }
+    .sm.primary{ background:var(--primary); color:#fff; }
+    .sm.ghost{ background:#f1f1f1; }
+    :root[data-theme="dark"] .sm.ghost{ background:#1f1f1f; }
 
     /* Toast */
-    #toast {
-      position:fixed; left:50%; bottom: max(24px, calc(env(safe-area-inset-bottom) + 12px));
-      transform:translateX(-50%);
-      background:#323232; color:#fff; padding:10px 14px; border-radius:10px;
-      opacity:0; pointer-events:none; transition:opacity .2s, transform .2s; z-index:9999;
+    #toast{
+      position:fixed; left:50%; bottom:max(24px, calc(env(safe-area-inset-bottom) + 12px));
+      transform:translateX(-50%); background:var(--toast); color:var(--toastText);
+      padding:10px 14px; border-radius:10px; opacity:0; pointer-events:none; transition:opacity .2s, transform .2s; z-index:9999;
     }
-    #toast.show { opacity:1; transform:translateX(-50%) translateY(-6px); }
+    #toast.show{ opacity:1; transform:translateX(-50%) translateY(-6px); }
 
-    /* Splash pre-auth: evita flash di login */
-    .splash {
-      position: fixed; inset: 0;
-      display: flex; align-items: center; justify-content: center;
-      background: var(--bg); color: var(--muted); font: 14px/1.2 system-ui, Arial;
-      z-index: 2000;
+    /* Splash pre-auth */
+    .splash{
+      position:fixed; inset:0; display:flex; align-items:center; justify-content:center;
+      background:var(--bg); color:var(--muted); font:14px/1.2 system-ui, Arial;
+      z-index:2000;
     }
-    .preauth #authBox, .preauth #appBox, .preauth #statuschip { display:none !important; }
-    #splash { display:none; }
-    .preauth #splash { display:flex; }
+    .preauth #authBox, .preauth #appBox, .preauth .top-tools{ display:none !important; }
+    #splash{ display:none; }
+    .preauth #splash{ display:flex; }
   </style>
 </head>
 <body class="preauth">
@@ -137,27 +144,16 @@
       </div>
     </noscript>
 
-    <!-- Splash durante l'inizializzazione Auth (evita flash della login) -->
+    <!-- Splash -->
     <div id="splash" class="splash" aria-live="polite">Avvio…</div>
 
-    <!-- LOGIN -->
-    <div id="authBox" class="card hidden" style="margin-top: 28px;">
-      <h3>🔐 Accedi</h3>
-      <div class="row">
-        <input id="email" type="email" placeholder="Email" autocomplete="email" inputmode="email">
-        <input id="pass" type="password" placeholder="Password" autocomplete="current-password">
+    <!-- TOOLS (tema + chip) -->
+    <div class="top-tools">
+      <button id="themeBtn" class="icon-btn" title="Tema">🌙</button>
+      <div id="statuschip" class="statuschip" aria-live="polite">
+        <span id="who" class="who" title="Clicca per impostare un nickname (solo su questo dispositivo)"></span>
+        <button id="logoutBtn" title="Logout" aria-label="Logout">🚪</button>
       </div>
-      <div class="row">
-        <button id="loginBtn">Accedi</button>
-        <button id="signupBtn">Registrati</button>
-      </div>
-      <p class="muted">Devi essere loggato per inserire attività e vedere le statistiche.</p>
-    </div>
-
-    <!-- CHIP UTENTE MINIMALE -->
-    <div id="statuschip" class="statuschip" aria-live="polite">
-      <span id="who" class="who" title="Clicca per impostare un nickname (solo su questo dispositivo)"></span>
-      <button id="logoutBtn" class="icon-btn" title="Logout" aria-label="Logout">🚪</button>
     </div>
 
     <!-- Popover nickname -->
@@ -171,9 +167,23 @@
       </div>
     </div>
 
+    <!-- LOGIN -->
+    <div id="authBox" class="card hidden" style="margin-top: 56px;">
+      <h3>🔐 Accedi</h3>
+      <div class="row">
+        <input id="email" type="email" placeholder="Email" autocomplete="email" inputmode="email">
+        <input id="pass" type="password" placeholder="Password" autocomplete="current-password">
+      </div>
+      <div class="row">
+        <button id="loginBtn">Accedi</button>
+        <button id="signupBtn">Registrati</button>
+      </div>
+      <p class="muted">Devi essere loggato per inserire attività e vedere le statistiche.</p>
+    </div>
+
     <!-- APP -->
     <div id="appBox" class="hidden">
-      <div class="card" style="margin-top: 28px;">
+      <div class="card" style="margin-top: 56px;">
         <h3>📥 Inserisci attività</h3>
 
         <input type="text" id="activity" placeholder="Attività..." inputmode="text">
@@ -200,7 +210,6 @@
           </select>
         </div>
 
-        <!-- Bottone Aggiungi centrato e largo -->
         <div class="addWrap"><button id="addBtn">➕ Aggiungi</button></div>
 
         <div id="msg" class="muted" style="margin-top:6px"></div>
@@ -214,7 +223,7 @@
   <div id="toast"></div>
 
   <script>
-    // === Firebase init ===
+    /* ===== Firebase ===== */
     const firebaseConfig = {
       apiKey: "AIzaSyDEq8aUhdBPcjYM6H6909DldXAdjhRNWbI",
       authDomain: "time-ff7ed.firebaseapp.com",
@@ -226,7 +235,6 @@
     };
     if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
 
-    // Offline persistence
     firebase.firestore().enablePersistence({synchronizeTabs:true}).catch(e=>{
       console.warn('Persistence non attiva:', e.code);
     });
@@ -234,7 +242,27 @@
     const auth = firebase.auth();
     const db   = firebase.firestore();
 
-    // === Helpers UI ===
+    /* ===== Tema ===== */
+    const THEME_KEY='tt_theme';
+    const themeBtn = document.getElementById('themeBtn');
+    function applyTheme(t){
+      document.documentElement.setAttribute('data-theme', t);
+      localStorage.setItem(THEME_KEY, t);
+      themeBtn.textContent = (t==='dark' ? '☀️' : '🌙');
+      // aggiorna meta theme-color (utile in PWA)
+      const meta = document.querySelector('meta[name="theme-color"]');
+      if (meta) meta.setAttribute('content', t==='dark' ? '#0b1118' : '#2196f3');
+    }
+    (function initTheme(){
+      const cur = document.documentElement.getAttribute('data-theme') || 'light';
+      applyTheme(cur);
+    })();
+    themeBtn.addEventListener('click', ()=>{
+      const cur = document.documentElement.getAttribute('data-theme') || 'light';
+      applyTheme(cur==='dark' ? 'light' : 'dark');
+    });
+
+    /* ===== Helpers UI ===== */
     const $ = s => document.querySelector(s);
     const authBox   = $('#authBox');
     const appBox    = $('#appBox');
@@ -255,8 +283,8 @@
     }
     function getLocalISODateTimeNow(){
       const now = new Date(); now.setSeconds(0,0);
-      const tzOffset = -now.getTimezoneOffset();
-      return new Date(now.getTime() + tzOffset * 60000).toISOString().slice(0,16);
+      const tz = -now.getTimezoneOffset();
+      return new Date(now.getTime()+tz*60000).toISOString().slice(0,16);
     }
     function loadNick(){ try { return localStorage.getItem(NICK_KEY) || ''; } catch { return ''; } }
     function saveNick(v){ try { localStorage.setItem(NICK_KEY, v||''); } catch {} }
@@ -277,7 +305,7 @@
       }
     }
 
-    // === Auth state (con fix anti-flash) ===
+    /* ===== Auth state (anti-flash) ===== */
     let firstAuthEventHandled = false;
     auth.onAuthStateChanged(user => {
       if (user) {
@@ -300,14 +328,13 @@
         toggleNickPop(false);
       }
 
-      // rimuove splash la PRIMA volta che riceviamo lo stato auth
       if (!firstAuthEventHandled) {
         document.body.classList.remove('preauth');
         firstAuthEventHandled = true;
       }
     });
 
-    // === Auth actions ===
+    /* ===== Auth actions ===== */
     $('#loginBtn').onclick = async () => {
       const email = $('#email').value.trim();
       const pass  = $('#pass').value;
@@ -326,7 +353,6 @@
       if (!confirm('Sei sicuro di voler uscire?')) return;
       auth.signOut();
     };
-
     function mapAuthError(code, fallback){
       const map = {
         'auth/invalid-email': 'Email non valida.',
@@ -338,7 +364,7 @@
       return map[code] || fallback || 'Errore.';
     }
 
-    // === Nickname (solo locale) ===
+    /* ===== Nickname (solo locale) ===== */
     whoEl.onclick = () => toggleNickPop(true);
     $('#cancelNickBtn').onclick = () => toggleNickPop(false);
     $('#saveNickBtn').onclick = () => {
@@ -360,7 +386,7 @@
       if (!withinPop && !clickedWho) toggleNickPop(false);
     });
 
-    // === Add activity ===
+    /* ===== Add activity ===== */
     $('#addBtn').onclick = async () => {
       const user = auth.currentUser;
       if (!user) return setMsg('Devi essere loggato.');
@@ -382,7 +408,7 @@
       }
     };
 
-    // === Service Worker ===
+    /* ===== Service Worker ===== */
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('service-worker.js')
         .then(()=>console.log('✅ Service Worker registrato'))
