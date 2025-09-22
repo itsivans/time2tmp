@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <title>Activity Tracker</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <link rel="manifest" href="manifest.json">
   <link rel="icon" href="icon-192.png">
   <meta name="theme-color" content="#2196f3">
@@ -18,82 +18,112 @@
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 
   <style>
-    *{box-sizing:border-box}
-    body{margin:0; font-family:system-ui, -apple-system, Segoe UI, Roboto, Arial; background:var(--bg); color:var(--text)}
-    header{padding:12px 16px; border-bottom:1px solid var(--line); display:flex; align-items:center; gap:10px; flex-wrap:wrap}
-    header h1{margin:0; font-size:18px; font-weight:800}
-    .right{margin-left:auto; display:flex; gap:8px; align-items:center}
+    :root{ --radius:12px; --pad:14px; --maxw:840px; }
+    *{ box-sizing:border-box; -webkit-tap-highlight-color: transparent; }
+    html,body{ height:100%; }
+    body{
+      margin:0; font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;
+      background:var(--bg); color:var(--text);
+    }
 
-    .btn{padding:10px 12px; border:1px solid var(--line); border-radius:10px; background:transparent; color:var(--text); cursor:pointer; font-size:14px}
-    .btn.primary{background:var(--link); border-color:var(--link); color:#fff}
-    a.link-btn{background:var(--link); color:#fff; padding:8px 10px; border-radius:8px; text-decoration:none; font-size:14px}
+    /* Header */
+    header{
+      position:sticky; top:0; z-index:50;
+      padding:12px 16px; border-bottom:1px solid var(--line);
+      display:flex; align-items:center; gap:10px; background:var(--bg);
+    }
+    header h1{ margin:0; font-size:18px; font-weight:800 }
+    .right{ margin-left:auto; display:flex; gap:8px; align-items:center }
+    .btn{ min-height:44px; padding:10px 12px; border:1px solid var(--line); border-radius:10px; background:transparent; color:var(--text); cursor:pointer; font-size:14px }
+    .btn.primary{ background:var(--link); border-color:var(--link); color:#fff }
+    a.link-btn{ display:inline-flex; align-items:center; justify-content:center; min-height:44px; background:var(--link); color:#fff; padding:8px 10px; border-radius:10px; text-decoration:none; font-size:14px }
 
-    .wrap{padding:14px 16px; display:grid; gap:14px}
-    .card{background:var(--card); border:1px solid var(--line); border-radius:12px; padding:12px}
-    .title{margin:0 0 8px; font-size:16px; font-weight:800}
-    .mini{font-size:12px; color:var(--muted)}
-    .inline{display:flex; align-items:center; gap:8px; flex-wrap:wrap}
+    /* Layout main */
+    .container{ width:100%; max-width:var(--maxw); margin:0 auto; padding:var(--pad); padding-bottom:88px; }
+    .card{ background:var(--card); border:1px solid var(--line); border-radius:var(--radius); padding:12px }
+    .title{ margin:0 0 8px; font-size:16px; font-weight:800 }
+    .mini{ font-size:12px; color:var(--muted) }
+    .inline{ display:flex; align-items:center; gap:8px; flex-wrap:wrap }
 
-    input, select{width:100%; padding:12px; margin:6px 0; font-size:16px; border:1px solid var(--line); border-radius:10px; background:transparent; color:var(--text)}
-    .row{display:flex; gap:8px; flex-wrap:wrap}
-    .row > *{flex:1 1 200px}
+    input, select{
+      width:100%; min-height:44px; padding:12px; margin:6px 0;
+      font-size:16px; border:1px solid var(--line); border-radius:10px; background:transparent; color:var(--text)
+    }
+    .row{ display:flex; gap:8px; flex-wrap:wrap }
+    .row > *{ flex:1 1 220px }
 
     /* Pill login minimale */
-    .pill{display:inline-flex; align-items:center; gap:8px; padding:6px 10px; border:1px solid var(--line); border-radius:999px; font-size:13px; background:transparent}
-    .logout{cursor:pointer}
+    .pill{ display:inline-flex; align-items:center; gap:8px; padding:6px 12px; border:1px solid var(--line); border-radius:999px; font-size:14px; background:transparent }
+    .logout{ cursor:pointer }
 
     /* Toast centrale */
-    .toast{position:fixed; inset:0; display:none; place-items:center; z-index:9999}
-    .toast.show{display:grid}
-    .toast .box{background:var(--toast); color:var(--toastText); padding:12px 16px; border-radius:12px; box-shadow:0 10px 30px rgba(0,0,0,.25)}
-    .toast .ok{margin-left:8px; border:1px solid rgba(255,255,255,.2); padding:4px 8px; border-radius:8px; cursor:pointer; font-size:12px; background:transparent; color:inherit}
+    .toast{ position:fixed; inset:0; display:none; place-items:center; z-index:80; padding:16px }
+    .toast.show{ display:grid }
+    .toast .box{ background:var(--toast); color:var(--toastText); padding:12px 16px; border-radius:12px; box-shadow:0 10px 30px rgba(0,0,0,.25) }
+    .toast .ok{ margin-left:8px; border:1px solid rgba(255,255,255,.2); padding:6px 10px; border-radius:8px; cursor:pointer; font-size:12px; background:transparent; color:inherit }
 
     /* Tabella ultimi 5 */
-    table{width:100%; border-collapse:collapse}
-    th, td{border:1px solid var(--line); padding:6px 8px; font-size:14px; vertical-align:middle}
-    th{text-align:left}
-    .actions{white-space:nowrap}
-    .sm{padding:6px 10px; border:1px solid var(--line); border-radius:8px; background:transparent; color:var(--text); cursor:pointer; font-size:13px}
-    .sm.danger{border-color:#ffb3c1; color:#ff2d55}
-    .sm.primary{background:var(--link); border-color:var(--link); color:#fff}
+    .table-wrap{ overflow:auto; -webkit-overflow-scrolling:touch; border-radius:10px; border:1px solid var(--line); }
+    table{ width:100%; border-collapse:collapse; min-width:560px; background:transparent }
+    th, td{ border-bottom:1px solid var(--line); padding:10px 8px; font-size:14px; vertical-align:middle; }
+    th{ background:transparent; text-align:left; position:sticky; top:0; }
+    .actions{ white-space:nowrap }
+    .sm{ min-height:36px; padding:6px 10px; border:1px solid var(--line); border-radius:8px; background:transparent; color:var(--text); cursor:pointer; font-size:13px }
+    .sm.danger{ border-color:#ffb3c1; color:#ff2d55 }
+    .sm.primary{ background:var(--link); border-color:var(--link); color:#fff }
 
     /* Pannello tag/categorie */
-    .panel{display:none; padding:10px; border:1px dashed var(--line); border-radius:10px; background:transparent; margin-top:6px}
-    .panel.show{display:block}
-    .maplist{display:flex; gap:6px; flex-wrap:wrap; margin-top:6px}
-    .pill2{border:1px solid var(--line); border-radius:999px; padding:4px 8px; font-size:12px}
+    .panel{ display:none; padding:10px; border:1px dashed var(--line); border-radius:10px; background:transparent; margin-top:6px }
+    .panel.show{ display:block }
+    .maplist{ display:flex; gap:6px; flex-wrap:wrap; margin-top:6px }
+    .pill2{ border:1px solid var(--line); border-radius:999px; padding:6px 10px; font-size:12px }
 
     /* Modale edit */
-    .overlay{position:fixed; inset:0; background:rgba(0,0,0,.35); display:none; align-items:center; justify-content:center; z-index:9998}
-    .overlay.show{display:flex}
-    .modal{width:min(520px,92vw); background:var(--bg); border:1px solid var(--line); border-radius:12px; padding:12px}
-    .modal h3{margin:0 0 8px}
-    .btns{display:flex; gap:8px; justify-content:flex-end}
+    .overlay{ position:fixed; inset:0; background:rgba(0,0,0,.35); display:none; align-items:center; justify-content:center; z-index:90; padding:16px }
+    .overlay.show{ display:flex }
+    .modal{ width:min(520px,92vw); background:var(--bg); border:1px solid var(--line); border-radius:12px; padding:12px }
+    .modal h3{ margin:0 0 8px }
+    .btns{ display:flex; gap:8px; justify-content:flex-end }
+
+    /* Bottom Action Bar (mobile) */
+    .actionbar{
+      position:fixed; left:0; right:0; bottom:0; z-index:60;
+      padding:10px max(env(safe-area-inset-left,16px),16px) calc(10px + env(safe-area-inset-bottom,0));
+      background:var(--bg); border-top:1px solid var(--line); display:flex; gap:8px;
+    }
+    .actionbar .btn, .actionbar .link-btn{ flex:1; justify-content:center; }
+
+    /* Spaziature + desktop tweaks */
+    @media (min-width:900px){
+      .container{ padding-bottom:20px; }
+      .actionbar{ display:none; }
+    }
   </style>
 </head>
 <body>
 <header>
   <h1>Activity Tracker</h1>
   <div class="right">
-    <!-- Toggle tema top-right, gestito da theme.js -->
+    <!-- Toggle tema top-right (theme.js gestisce l’icona) -->
     <button id="themeBtn" class="btn" title="Tema">🌙</button>
 
-    <!-- Pill di login minimale -->
+    <!-- Pill login minimal -->
     <span id="userPill" class="pill" style="display:none">
       <span id="userLabel">—</span>
       <span id="logoutBtn" class="logout" title="Logout">🚪</span>
     </span>
 
+    <!-- Link desktop a Statistiche (su mobile c’è anche nella barra in basso) -->
     <a class="link-btn" href="statistics.html">📊 Statistiche</a>
   </div>
 </header>
 
-<div class="wrap">
-  <!-- Box autenticazione -->
+<div class="container">
+  <!-- Auth -->
   <div id="authBox" class="card">
     <div class="title">Accedi</div>
     <div class="row">
-      <input id="email" type="email" placeholder="Email" autocomplete="email">
+      <input id="email" type="email" placeholder="Email" autocomplete="email" inputmode="email">
       <input id="pass" type="password" placeholder="Password" autocomplete="current-password">
     </div>
     <div class="row">
@@ -113,18 +143,19 @@
       <div class="mini">Ultima attività: <b id="lastActivity">—</b></div>
     </div>
 
-    <input type="text" id="activity" placeholder="Attività…">
+    <input type="text" id="activity" placeholder="Attività…" inputmode="text">
     <div class="row">
       <input type="datetime-local" id="dateTime">
       <select id="tag"></select>
     </div>
+    <!-- Bottone “Aggiungi” anche dentro la card (utile su desktop) -->
     <button id="addBtn" class="btn primary">➕ Aggiungi</button>
   </div>
 
-  <!-- Pannello gestione tag/categorie -->
+  <!-- Pannello tag/categorie -->
   <div id="gearPanel" class="panel" aria-hidden="true">
     <div class="row">
-      <input id="newTagName" placeholder="Nuovo tag (es. Nut)">
+      <input id="newTagName" placeholder="Nuovo tag (es. Nut)" inputmode="text">
       <select id="newTagCat">
         <option value="good">Produttivo</option>
         <option value="neutral">Neutro</option>
@@ -141,15 +172,23 @@
   <!-- Ultimi 5 -->
   <div id="listBox" class="card" style="display:none">
     <div class="title">Ultimi 5</div>
-    <table>
-      <thead><tr><th>Data</th><th>Ora</th><th>Tag</th><th>Attività</th><th class="actions">Azioni</th></tr></thead>
-      <tbody id="activityList"></tbody>
-    </table>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Data</th><th>Ora</th><th>Tag</th><th>Attività</th><th class="actions">Azioni</th></tr></thead>
+        <tbody id="activityList"></tbody>
+      </table>
+    </div>
   </div>
 </div>
 
+<!-- Bottom Action Bar (mobile) -->
+<div class="actionbar">
+  <button id="addBtnBottom" class="btn primary">➕ Aggiungi</button>
+  <a class="link-btn" href="statistics.html">📊 Statistiche</a>
+</div>
+
 <!-- Toast -->
-<div class="toast" id="toast">
+<div class="toast" id="toast" aria-live="polite" aria-atomic="true">
   <div class="box">
     <span id="toastMsg">Salvato</span>
     <button class="ok" onclick="document.getElementById('toast').classList.remove('show')">OK</button>
@@ -160,7 +199,7 @@
 <div id="editOverlay" class="overlay" aria-hidden="true">
   <div class="modal" role="dialog" aria-modal="true" aria-labelledby="editTitle">
     <h3 id="editTitle">✏️ Modifica</h3>
-    <input type="text" id="editActivity" placeholder="Attività…">
+    <input type="text" id="editActivity" placeholder="Attività…" inputmode="text">
     <div class="row">
       <input type="datetime-local" id="editDateTime">
       <select id="editTag"></select>
@@ -212,18 +251,14 @@ let currentUid=null, unsubLatest=null, currentEditId=null;
 
 /* ================= Auth UI ================= */
 function setLoggedUI(user){
+  const show = v => v?'':'none';
+  $('#authBox').style.display = show(!user);
+  $('#appBox').style.display  = show(!!user);
+  $('#listBox').style.display = show(!!user);
+  $('#userPill').style.display= user?'inline-flex':'none';
   if (user){
-    $('#authBox').style.display='none';
-    $('#appBox').style.display='';
-    $('#listBox').style.display='';
-    $('#userPill').style.display='inline-flex';
-    $('#userLabel').textContent=user.email||user.uid;
+    $('#userLabel').textContent = user.email || user.uid;
     if (!$('#dateTime').value) $('#dateTime').value=getLocalISODateTimeNow();
-  } else {
-    $('#authBox').style.display='';
-    $('#appBox').style.display='none';
-    $('#listBox').style.display='none';
-    $('#userPill').style.display='none';
   }
 }
 auth.onAuthStateChanged(u=>{
@@ -238,7 +273,8 @@ $('#logoutBtn').onclick=async()=>{ if(!confirm('Sei sicuro di voler uscire?')) r
 $('#activity').addEventListener('keydown', e=>{ if(e.key==='Enter') $('#addBtn').click(); });
 $('#activity').addEventListener('focus', ()=>{ if(!$('#dateTime').value) $('#dateTime').value=getLocalISODateTimeNow(); });
 $('#dateTime').addEventListener('focus', function(){ if(!this.value) this.value=getLocalISODateTimeNow(); });
-$('#addBtn').onclick=async()=>{
+
+async function doAdd(){
   const u=auth.currentUser; if(!u) return toast('Devi essere loggato');
   const activity=$('#activity').value.trim(); const tag=$('#tag').value;
   let dateTime=$('#dateTime').value||getLocalISODateTimeNow();
@@ -248,6 +284,12 @@ $('#addBtn').onclick=async()=>{
     $('#activity').value=''; $('#dateTime').value='';
     toast('Attività salvata');
   }catch(e){ console.error(e); toast('Errore: '+e.message); }
+}
+$('#addBtn').onclick = doAdd;
+$('#addBtnBottom').onclick = ()=>{ // bottone barra mobile
+  doAdd();
+  // scroll su “Ultimi 5” per feedback immediato
+  setTimeout(()=>document.getElementById('listBox').scrollIntoView({behavior:'smooth'}), 250);
 };
 
 /* ================= Ultima attività ================= */
@@ -296,9 +338,9 @@ async function openEdit(id){
   $('#editOverlay').classList.add('show'); $('#editOverlay').setAttribute('aria-hidden','false');
 }
 function closeEdit(){ currentEditId=null; $('#editOverlay').classList.remove('show'); $('#editOverlay').setAttribute('aria-hidden','true'); }
-$('#cancelEditBtn').onclick=closeEdit;
+document.getElementById('cancelEditBtn').onclick=closeEdit;
 
-$('#saveEditBtn').onclick=async()=>{
+document.getElementById('saveEditBtn').onclick=async()=>{
   const u=auth.currentUser; if(!u||!currentEditId) return;
   const activity=$('#editActivity').value.trim();
   const timestamp=$('#editDateTime').value;
@@ -309,7 +351,7 @@ $('#saveEditBtn').onclick=async()=>{
     closeEdit(); toast('Salvato');
   }catch(e){ console.error(e); toast('Errore: '+e.message); }
 };
-$('#deleteEditBtn').onclick=async()=>{
+document.getElementById('deleteEditBtn').onclick=async()=>{
   const u=auth.currentUser; if(!u||!currentEditId) return;
   if(!confirm('Eliminare definitivamente questa attività?')) return;
   try{
@@ -319,13 +361,13 @@ $('#deleteEditBtn').onclick=async()=>{
 };
 
 /* ================= Pannello tag/categorie ================= */
-$('#gearOpen').onclick=()=>{
+document.getElementById('gearOpen').onclick=()=>{
   const p=$('#gearPanel'); const open=!p.classList.contains('show');
   p.classList.toggle('show', open);
   p.setAttribute('aria-hidden', open?'false':'true');
   buildTagSelects(); renderTagListBox();
 };
-$('#addTagBtn').onclick=()=>{
+document.getElementById('addTagBtn').onclick=()=>{
   const name=String($('#newTagName').value||'').trim();
   const cat=$('#newTagCat').value;
   if(!name) return toast('Inserisci un nome tag');
@@ -335,7 +377,7 @@ $('#addTagBtn').onclick=()=>{
   toast(`Tag "${name}" aggiunto (${cat})`);
   $('#newTagName').value='';
 };
-$('#resetMapBtn').onclick=()=>{
+document.getElementById('resetMapBtn').onclick=()=>{
   if(!confirm('Cancellare tutte le mappature personalizzate?')) return;
   tagMap={}; saveJSON(MAP_KEY, tagMap);
   renderTagListBox(); toast('Mappature resettate');
