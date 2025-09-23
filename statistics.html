@@ -471,7 +471,12 @@ async function renderPeriod(uid){
 }
 
 /* ===================== TABELLA ATTIVITÀ ===================== */
-function toLocalDate(iso){ return iso? iso.slice(0,10):''; }
+function toLocalDate(iso){
+  if (!iso) return '';
+  const [y,m,d] = iso.slice(0,10).split('-');
+  return `${d}-${m}-${y}`;
+}
+
 function toLocalTime(iso){ return iso? iso.slice(11,16):''; }
 
 let currentUid=null;
@@ -656,7 +661,11 @@ async function saveEdit(){
     // aggiorna DOM (se la riga è presente)
     const tr=document.querySelector(`tr[data-id="${currentEditId}"]`);
     if(tr){
-      tr.children[0].textContent = ts.slice(0,10);
+      {
+  const [y,m,d] = ts.slice(0,10).split('-');
+  tr.children[0].textContent = `${d}-${m}-${y}`;
+}
+
       tr.children[1].textContent = ts.slice(11,16);
       tr.children[2].textContent = tag;
       tr.children[3].textContent = activity;
