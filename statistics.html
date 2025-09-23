@@ -88,18 +88,31 @@
   .cloud .pill{ cursor:pointer; }
   .pill.warn{ border-color: var(--warn); color: var(--warn); }
 
-  /* RECORDS tabella compatta */
+  /* ====== RECORDS: filtri compatti ====== */
+  .segmented{ display:flex; gap:6px; flex-wrap:wrap; align-items:center }
+  .segmented .segbtn{ padding:6px 10px; border:1px solid var(--line); background:transparent; color:var(--text); border-radius:999px; cursor:pointer; font-size:13px }
+  .segmented .segbtn.active{ background:var(--text); color:var(--bg); border-color:var(--text) }
   .recCtrl{ display:flex; gap:6px; align-items:center; flex-wrap:wrap; margin-top:8px }
   .recCtrl input, .recCtrl button{ padding:6px 8px; border:1px solid var(--line); border-radius:8px; font-size:14px; background:transparent; color:var(--text) }
-  .seg{ height:28px; width:1px; background:var(--line) }
-  .iconBtn{ padding:4px 8px; border:1px solid var(--line); border-radius:8px; background:transparent; color:var(--text); cursor:pointer; min-width:auto }
-  .iconBtn.save{ background:var(--good); color:#fff; border-color:var(--good) }
-  .iconBtn.del{ background:var(--bad); color:#fff; border-color:var(--bad) }
-  .k{ font-weight:700 }
+  .recCtrl .grow{ margin-left:auto; min-width:180px }
   .btn{ border:1px solid var(--line); background:transparent; color:var(--text); border-radius:8px; padding:6px 10px; cursor:pointer }
   .btn.primary{ background:var(--link); color:#fff; border-color:var(--link) }
-  .tagCell .tag{ background:var(--chip); border-radius:10px; padding:2px 8px; display:inline-block; }
-  input.inline{ width:100%; border:1px solid var(--line); border-radius:6px; padding:4px 6px; font-size:13px; background:transparent; color:var(--text) }
+  .iconBtn{ padding:4px 8px; border:1px solid var(--line); border-radius:8px; background:transparent; color:var(--text); cursor:pointer; min-width:auto }
+  .iconBtn.del{ background:var(--bad); color:#fff; border-color:var(--bad) }
+
+  /* ====== Overlay Modifica ====== */
+  .overlay{ position:fixed; inset:0; background:rgba(0,0,0,.36); display:none; align-items:center; justify-content:center; z-index:9999 }
+  .overlay.show{ display:flex }
+  .modal{ width:min(520px,92vw); background:var(--bg); color:var(--text); border:1px solid var(--line); border-radius:12px; padding:12px; box-shadow:0 10px 30px rgba(0,0,0,.25) }
+  .modal h3{ margin:0 0 8px; font-size:16px }
+  .row{ display:flex; gap:8px; flex-wrap:wrap }
+  .row > *{ flex:1 }
+  .modal input, .modal select, .modal button{ padding:8px 10px; border:1px solid var(--line); border-radius:8px; background:transparent; color:var(--text) }
+  .modal .btns{ display:flex; justify-content:space-between; gap:8px; margin-top:8px }
+  .btns .left, .btns .right{ display:flex; gap:8px }
+  .danger{ background:var(--bad); color:#fff; border-color:var(--bad) }
+  .primary{ background:var(--link); color:#fff; border-color:var(--link) }
+  .kbd{ font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size:12px; color:var(--muted) }
 </style>
 </head>
 <body>
@@ -200,14 +213,24 @@
   <!-- 📋 TABELLA ATTIVITÀ -->
   <section class="card">
     <h2 class="title">📋 Attività <span id="recCount" class="muted"></span></h2>
+
+    <!-- Segmented filter -->
+    <div class="segmented" id="segmented">
+      <button class="segbtn active" data-mode="today">Oggi (realtime)</button>
+      <button class="segbtn" data-mode="yesterday">Ieri</button>
+      <button class="segbtn" data-mode="last5">Ultimi 5</button>
+      <button class="segbtn" data-mode="last20">Ultimi 20</button>
+      <button class="segbtn" data-mode="range">Intervallo</button>
+    </div>
+
+    <!-- Controlli intervallo + ricerca -->
     <div class="recCtrl">
-      <button id="btnLast" class="btn primary">Ultimi 5 (realtime)</button>
-      <span class="seg"></span>
       <input type="date" id="recStart">
       <input type="date" id="recEnd">
-      <button id="recRefresh" class="btn">Mostra</button>
-      <input id="recSearch" placeholder="Filtra testo/tag" style="margin-left:auto; min-width:180px;">
+      <button id="recShow" class="btn">Mostra</button>
+      <input id="recSearch" class="grow" placeholder="Filtra testo/tag">
     </div>
+
     <table id="recTable">
       <thead>
         <tr>
@@ -226,6 +249,30 @@
       <button id="loadMore" class="btn" style="margin-top:6px;">Carica altri</button>
     </div>
   </section>
+</div>
+
+<!-- Overlay Modifica -->
+<div id="editOverlay" class="overlay" aria-hidden="true">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="editTitle">
+    <h3 id="editTitle">✏️ Modifica attività</h3>
+    <input type="text" id="editActivity" placeholder="Attività…">
+    <div class="row">
+      <input type="datetime-local" id="editDateTime">
+      <!-- tag come input con datalist (suggestions) -->
+      <input type="text" id="editTag" list="tagSuggestions" placeholder="Tag">
+      <datalist id="tagSuggestions"></datalist>
+    </div>
+    <div class="btns">
+      <div class="left">
+        <button id="deleteEditBtn" class="btn danger">🗑️ Elimina</button>
+      </div>
+      <div class="right">
+        <span class="kbd">ESC chiude — Invio / ⌘S salva</span>
+        <button id="cancelEditBtn" class="btn">Annulla</button>
+        <button id="saveEditBtn" class="btn primary">Salva</button>
+      </div>
+    </div>
+  </div>
 </div>
 
 <script>
@@ -281,7 +328,7 @@ function addDaysYMD(ymd, d){ const [y,m,dy]=ymd.split('-').map(Number); const dt
 function fmtHM(m){ const h=Math.floor(m/60),mm=m%60; if(h>0&&mm>0)return `${h}h ${mm}m`; if(h>0)return `${h}h`; return `${mm}m`; }
 function col(uid){ return db.collection(`users/${uid}/activities`); }
 
-/* ===== Aggregazioni (come prima) ===== */
+/* ===== Aggregazioni per grafici ===== */
 function buildDayEvents(items, ymd, nextFirstTag){
   const ev=[]; if(items.length){ ev.push({tag:items[0].tag,timestamp:dayStart(ymd)}); items.forEach(it=>ev.push({tag:it.tag,timestamp:it.timestamp}));
     const end=dayEnd(ymd); const last=items[items.length-1].timestamp;
@@ -315,7 +362,6 @@ function percent(n,tot){ return tot>0?Math.round(100*n/tot):0; }
 let dailyDonut, perTrend;
 function destroyChart(ch){ if(ch) ch.destroy(); }
 
-/* ===== Day render ===== */
 async function fetchDay(uid, ymd){
   const snap=await col(uid).where('timestamp','>=',dayStart(ymd)).where('timestamp','<=',dayEnd(ymd)).orderBy('timestamp').get();
   const a=[]; snap.forEach(d=>a.push({tag:d.data().tag, timestamp:d.data().timestamp}));
@@ -355,7 +401,6 @@ async function renderDay(uid, ymd){
   });
 }
 
-/* ===== Period render ===== */
 async function fetchRange(uid, start, end){
   const snap=await col(uid).where('timestamp','>=',dayStart(start)).where('timestamp','<=',dayEnd(end)).orderBy('timestamp').get();
   const a=[]; snap.forEach(d=>a.push({tag:d.data().tag,timestamp:d.data().timestamp})); return a;
@@ -405,14 +450,206 @@ async function renderPeriod(uid){
   });
 }
 
-/* ===== Orchestrator ===== */
+/* ===================== TABELLA ATTIVITÀ ===================== */
+function toLocalDate(iso){ return iso? iso.slice(0,10):''; }
+function toLocalTime(iso){ return iso? iso.slice(11,16):''; }
+
 let currentUid=null;
-async function renderAll(){
-  const ymd=$('#dayPick').value;
-  $('#loading').textContent='Caricamento…';
-  await renderDay(currentUid, ymd);
-  await renderPeriod(currentUid);
-  $('#loading').textContent='Pronto';
+
+/* Segmented modes */
+let recMode='today';     // today|yesterday|last5|last20|range
+let recUnsub=null;       // for realtime
+let recLastDoc=null;     // paging
+let recHasMore=false;
+let recRange={start:null,end:null};
+const PAGE_FIRST=10, PAGE_NEXT=10;
+
+function setActiveSeg(mode){
+  recMode=mode;
+  document.querySelectorAll('.segbtn').forEach(b=> b.classList.toggle('active', b.dataset.mode===mode));
+  // abilita controlli intervallo solo in 'range'
+  const dis = (mode!=='range');
+  ['recStart','recEnd','recShow'].forEach(id=>{ const el=document.getElementById(id); el.disabled = dis; el.style.opacity = dis?.66:1; });
+}
+
+function rowHTML(r){
+  return `
+    <tr data-id="${r.id}">
+      <td>${toLocalDate(r.timestamp)}</td>
+      <td>${toLocalTime(r.timestamp)}</td>
+      <td>${(r.tag||'').replaceAll('<','&lt;')}</td>
+      <td>${(r.activity||'').replaceAll('<','&lt;')}</td>
+      <td class="c">
+        <button class="iconBtn edit" title="Modifica">✏️</button>
+        <button class="iconBtn del" title="Elimina">🗑️</button>
+      </td>
+    </tr>`;
+}
+function setTableLoading(){ $('#recTbody').innerHTML=`<tr><td class="c muted" colspan="5">Caricamento…</td></tr>`; }
+function setTableEmpty(){ $('#recTbody').innerHTML=`<tr><td class="c muted" colspan="5">Nessun record.</td></tr>`; }
+
+/* Helpers query */
+function qToday(uid){
+  const ymd=todayYMD();
+  return col(uid).where('timestamp','>=',dayStart(ymd)).where('timestamp','<=',dayEnd(ymd)).orderBy('timestamp','desc');
+}
+function qYesterday(uid){
+  const ymd=todayYMD(); const y=addDaysYMD(ymd,-1);
+  return col(uid).where('timestamp','>=',dayStart(y)).where('timestamp','<=',dayEnd(y)).orderBy('timestamp','desc');
+}
+function qLastN(uid,n){ return col(uid).orderBy('timestamp','desc').limit(n); }
+function qRange(uid, startYmd, endYmd){
+  return col(uid).where('timestamp','>=',dayStart(startYmd)).where('timestamp','<=',dayEnd(endYmd)).orderBy('timestamp','desc');
+}
+
+/* Render modes */
+function showToday(){
+  cleanupRealtime();
+  setTableLoading();
+  const q=qToday(currentUid);
+  recUnsub=q.onSnapshot(snap=>{
+    const body=$('#recTbody'); body.innerHTML='';
+    let count=0;
+    snap.forEach(doc=>{ const d=doc.data(); count++; body.insertAdjacentHTML('beforeend', rowHTML({id:doc.id, ...d})); });
+    if(!count) setTableEmpty();
+    $('#recCount').textContent=`(${count})`;
+    recHasMore=false; $('#loadMore').disabled=true;
+  });
+}
+async function showYesterday(){
+  cleanupRealtime();
+  setTableLoading();
+  const snap=await qYesterday(currentUid).get();
+  const body=$('#recTbody'); body.innerHTML='';
+  let count=0; snap.forEach(doc=>{ body.insertAdjacentHTML('beforeend', rowHTML({id:doc.id, ...doc.data()})); count++; });
+  if(!count) setTableEmpty();
+  $('#recCount').textContent=`(${count})`;
+  recHasMore=false; $('#loadMore').disabled=true;
+}
+async function showLastN(n){
+  cleanupRealtime();
+  setTableLoading();
+  const snap=await qLastN(currentUid,n).get();
+  const body=$('#recTbody'); body.innerHTML='';
+  let count=0; snap.forEach(doc=>{ body.insertAdjacentHTML('beforeend', rowHTML({id:doc.id, ...doc.data()})); count++; });
+  if(!count) setTableEmpty();
+  $('#recCount').textContent=`(${count})`;
+  recHasMore=false; $('#loadMore').disabled=true;
+}
+async function showRange(firstLoad=true){
+  cleanupRealtime();
+  const start=$('#recStart').value || todayYMD();
+  const end=$('#recEnd').value || $('#recStart').value || todayYMD();
+  recRange={start,end};
+  if(firstLoad){ setTableLoading(); recLastDoc=null; }
+  let q=qRange(currentUid,start,end).limit(firstLoad?PAGE_FIRST:PAGE_NEXT);
+  if(recLastDoc) q=q.startAfter(recLastDoc);
+  const snap=await q.get();
+  if(firstLoad){
+    const body=$('#recTbody'); body.innerHTML='';
+    if(snap.empty){ setTableEmpty(); $('#recCount').textContent='(0)'; recHasMore=false; $('#loadMore').disabled=true; return; }
+    snap.forEach(doc=> body.insertAdjacentHTML('beforeend', rowHTML({id:doc.id, ...doc.data()})));
+  }else{
+    const body=$('#recTbody');
+    if(snap.empty){ recHasMore=false; $('#loadMore').disabled=true; return; }
+    snap.forEach(doc=> body.insertAdjacentHTML('beforeend', rowHTML({id:doc.id, ...doc.data()})));
+  }
+  recLastDoc = snap.docs[snap.docs.length-1] || null;
+  recHasMore = !!recLastDoc; $('#loadMore').disabled=!recHasMore;
+  const cur = document.querySelectorAll('#recTbody tr').length;
+  $('#recCount').textContent = `(${cur}${recHasMore?'+':''})`;
+}
+function cleanupRealtime(){ if(recUnsub){ recUnsub(); recUnsub=null; } }
+
+/* Ricerca live (client-side sui record in DOM) */
+$('#recSearch').addEventListener('input', ()=>{
+  const q=($('#recSearch').value||'').toLowerCase();
+  const rows=[...document.querySelectorAll('#recTbody tr')];
+  let vis=0; rows.forEach(tr=>{
+    const tds=[...tr.children];
+    const text=(tds[2].textContent+' '+tds[3].textContent).toLowerCase();
+    const show=!q || text.includes(q);
+    tr.style.display = show? '' : 'none';
+    if(show) vis++;
+  });
+  $('#recCount').textContent = `(${vis}${recHasMore?'+':''})`;
+});
+
+/* Azioni tabella: Modifica/Elimina -> overlay */
+let currentEditId=null;
+function bindTableActions(){
+  $('#recTbody').addEventListener('click', async (e)=>{
+    const btn=e.target.closest('button'); if(!btn) return;
+    const tr=e.target.closest('tr'); const id=tr?.dataset?.id;
+    if(!id) return;
+    if(btn.classList.contains('edit')){
+      openEdit(id);
+    }else if(btn.classList.contains('del')){
+      if(!confirm('Eliminare definitivamente questo record?')) return;
+      try{ await col(currentUid).doc(id).delete(); tr.remove(); if(!document.querySelector('#recTbody tr')) setTableEmpty();
+        const cur = parseInt(($('#recCount').textContent.match(/\d+/)||[0])[0],10)||1;
+        $('#recCount').textContent = `(${Math.max(0,cur-1)}${recHasMore?'+':''})`;
+      }catch(err){ alert('Errore eliminazione: '+err.message); }
+    }
+  });
+}
+
+/* ===== Overlay ===== */
+const overlay=$('#editOverlay');
+function fillTagSuggestions(extraSet){
+  const dl=$('#tagSuggestions'); dl.innerHTML='';
+  const all = new Set([...DEFAULT_TAGS, ...Object.keys(customMap), ...(extraSet||[])]);
+  Array.from(all).sort((a,b)=>a.localeCompare(b)).forEach(t=>{
+    const opt=document.createElement('option'); opt.value=t; dl.appendChild(opt);
+  });
+}
+
+async function openEdit(id){
+  currentEditId=id;
+  try{
+    const snap=await col(currentUid).doc(id).get();
+    if(!snap.exists) return alert('Documento non trovato.');
+    const d=snap.data();
+    $('#editActivity').value = d.activity||'';
+    $('#editTag').value      = d.tag||'';
+    $('#editDateTime').value = (d.timestamp||'').slice(0,16);
+    overlay.classList.add('show'); overlay.setAttribute('aria-hidden','false');
+    $('#editActivity').focus();
+  }catch(e){ alert('Errore apertura: '+e.message); }
+}
+function closeEdit(){
+  currentEditId=null;
+  overlay.classList.remove('show'); overlay.setAttribute('aria-hidden','true');
+}
+async function saveEdit(){
+  if(!currentEditId) return;
+  const activity=$('#editActivity').value.trim();
+  const tag=$('#editTag').value.trim();
+  const ts=$('#editDateTime').value;
+  if(!activity||!tag||!ts) return alert('Compila attività, tag e data/ora.');
+  try{
+    await col(currentUid).doc(currentEditId).update({ activity, tag, timestamp: ts });
+    closeEdit();
+    // aggiorna DOM (se la riga è presente)
+    const tr=document.querySelector(`tr[data-id="${currentEditId}"]`);
+    if(tr){
+      tr.children[0].textContent = ts.slice(0,10);
+      tr.children[1].textContent = ts.slice(11,16);
+      tr.children[2].textContent = tag;
+      tr.children[3].textContent = activity;
+    }
+  }catch(e){ alert('Errore salvataggio: '+e.message); }
+}
+async function deleteFromOverlay(){
+  if(!currentEditId) return;
+  if(!confirm('Eliminare definitivamente questo record?')) return;
+  try{
+    await col(currentUid).doc(currentEditId).delete();
+    const tr=document.querySelector(`tr[data-id="${currentEditId}"]`);
+    if(tr) tr.remove();
+    if(!document.querySelector('#recTbody tr')) setTableEmpty();
+    closeEdit();
+  }catch(e){ alert('Errore eliminazione: '+e.message); }
 }
 
 /* ===== Tag cloud (mapping helper) ===== */
@@ -432,158 +669,8 @@ async function buildTagCloud(uid){
     pill.addEventListener('click',()=>{ $('#tagName').value=tag; $('#tagCat').focus(); });
     cloudEl.appendChild(pill);
   });
-}
-
-/* ===================== TABELLA ATTIVITÀ ===================== */
-function toLocalDateTimeParts(iso){
-  if(!iso) return {d:'',t:''};
-  const dt=new Date(iso);
-  const d=dt.toLocaleDateString('it-IT',{timeZone:'Europe/Rome'});
-  const t=dt.toLocaleTimeString('it-IT',{timeZone:'Europe/Rome',hour12:false});
-  return {d,t};
-}
-function toInputDT(iso){ return iso? iso.slice(0,16):''; }
-function fromInputDT(v){ return v; } // timestamp è già in ISO “YYYY-MM-DDTHH:MM”
-
-let recUnsub = null;          // realtime subscription per “Ultimi 5”
-let recLastDoc = null;        // ultimo documento paginazione
-let recHasMore = false;       // se ci sono altre pagine
-let recMode   = 'latest';     // 'latest' | 'range'
-let recRange  = {start:null, end:null};
-const PAGE_FIRST = 5;
-const PAGE_NEXT  = 10;
-
-function rowHTML(r){
-  const parts = toLocalDateTimeParts(r.timestamp);
-  return `
-    <tr data-id="${r.id}">
-      <td><input class="inline rDate" type="date" value="${(r.timestamp||'').slice(0,10)}" disabled></td>
-      <td><input class="inline rTime" type="time" value="${(r.timestamp||'').slice(11,16)}" disabled></td>
-      <td class="tagCell"><input class="inline rTag" value="${(r.tag||'').replaceAll('<','&lt;')}" disabled></td>
-      <td><input class="inline rAct" value="${(r.activity||'').replaceAll('<','&lt;')}" disabled></td>
-      <td class="c">
-        <button class="iconBtn edit" title="Modifica">✏️</button>
-        <button class="iconBtn del"  title="Elimina">🗑️</button>
-      </td>
-    </tr>`;
-}
-
-function bindTableEvents(){
-  // Ricerca live (solo sui record già in DOM)
-  $('#recSearch').addEventListener('input', ()=>{
-    const q=($('#recSearch').value||'').toLowerCase();
-    const rows=[...document.querySelectorAll('#recTbody tr')];
-    let vis=0; rows.forEach(tr=>{
-      const act=tr.querySelector('.rAct')?.value.toLowerCase()||'';
-      const tag=tr.querySelector('.rTag')?.value.toLowerCase()||'';
-      const show=!q || act.includes(q) || tag.includes(q);
-      tr.style.display=show?'':'none'; if(show) vis++;
-    });
-    $('#recCount').textContent = vis ? `(${vis}${recHasMore?'+':''})` : '(0)';
-  });
-
-  // Click su Azioni
-  $('#recTbody').addEventListener('click', async (e)=>{
-    const btn=e.target.closest('button'); if(!btn) return;
-    const tr=e.target.closest('tr'); const id=tr?.dataset?.id; if(!id) return;
-
-    if(btn.classList.contains('edit')){
-      const saving=btn.classList.contains('save');
-      if(!saving){
-        toggleEdit(tr,true);
-      }else{
-        try{
-          const y=tr.querySelector('.rDate').value;
-          const hh=tr.querySelector('.rTime').value;
-          const activity=tr.querySelector('.rAct').value.trim();
-          const tag=tr.querySelector('.rTag').value.trim();
-          const ts = `${y}T${hh}`;
-          await col(currentUid).doc(id).update({ activity, tag, timestamp: ts });
-          toggleEdit(tr,false);
-          btn.classList.remove('save');
-        }catch(err){ alert('Errore salvataggio: '+err.message); }
-      }
-    } else if(btn.classList.contains('del')){
-      if(!confirm('Eliminare definitivamente questo record?')) return;
-      try{
-        await col(currentUid).doc(id).delete();
-        tr.remove();
-        if(!document.querySelector('#recTbody tr')){
-          $('#recTbody').innerHTML = `<tr><td class="c muted" colspan="5">Nessun record.</td></tr>`;
-        }
-        // aggiorna contatore approssimato
-        const cur = parseInt(($('#recCount').textContent.match(/\d+/)||[0])[0],10)||1;
-        $('#recCount').textContent = `(${Math.max(0,cur-1)}${recHasMore?'+':''})`;
-      }catch(err){ alert('Errore eliminazione: '+err.message); }
-    }
-  });
-
-  // Carica altri
-  $('#loadMore').addEventListener('click', async ()=>{
-    if(recMode!=='range' || !recHasMore) return;
-    const {rows,lastDoc,size} = await fetchPage(recRange.start, recRange.end, recLastDoc, PAGE_NEXT);
-    if(!size){ recHasMore=false; $('#loadMore').disabled=true; return; }
-    const body=$('#recTbody');
-    rows.forEach(r=>{
-      const temp=document.createElement('tbody'); temp.innerHTML=rowHTML(r); body.appendChild(temp.firstElementChild);
-    });
-    recLastDoc=lastDoc; recHasMore=!!lastDoc; $('#loadMore').disabled=!recHasMore;
-    const cur = parseInt(($('#recCount').textContent.match(/\d+/)||[0])[0],10)||0;
-    $('#recCount').textContent = `(${cur + size}${recHasMore?'+':''})`;
-  });
-}
-
-function toggleEdit(tr, on){
-  ['.rDate','.rTime','.rTag','.rAct'].forEach(sel=>{ tr.querySelector(sel).disabled=!on; });
-  const btn=tr.querySelector('.edit'); btn.textContent=on?'💾':'✏️'; btn.classList.toggle('save', on); btn.title=on?'Salva':'Modifica';
-}
-
-function setTableLoading(){ $('#recTbody').innerHTML = `<tr><td class="c muted" colspan="5">Caricamento…</td></tr>`; }
-
-async function fetchPage(startYmd, endYmd, afterDoc, size){
-  let q = col(currentUid)
-    .where('timestamp','>=', dayStart(startYmd))
-    .where('timestamp','<=', dayEnd(endYmd))
-    .orderBy('timestamp','desc')
-    .limit(size);
-  if(afterDoc) q=q.startAfter(afterDoc);
-  const snap=await q.get(); const out=[];
-  snap.forEach(doc=>{ const d=doc.data(); out.push({id:doc.id, activity:d.activity||'', tag:d.tag||'', timestamp:d.timestamp||''});});
-  const last=snap.docs[snap.docs.length-1]||null;
-  return {rows:out,lastDoc:last,size:snap.size};
-}
-
-/* --- Modalità “Ultimi 5 (realtime)” --- */
-function showLatestRealtime(){
-  recMode='latest'; $('#loadMore').disabled=true;
-  if(recUnsub){ recUnsub(); recUnsub=null; }
-  setTableLoading();
-  const q = col(currentUid).orderBy('timestamp','desc').limit(5);
-  recUnsub = q.onSnapshot(snap=>{
-    const body=$('#recTbody'); body.innerHTML='';
-    let count=0;
-    snap.forEach(doc=>{
-      const d=doc.data(); count++;
-      const row = rowHTML({id:doc.id, activity:d.activity||'', tag:d.tag||'', timestamp:d.timestamp||''});
-      const tmp=document.createElement('tbody'); tmp.innerHTML=row; body.appendChild(tmp.firstElementChild);
-    });
-    $('#recCount').textContent = `(${count})`;
-  });
-}
-
-/* --- Modalità “Range + paging” --- */
-async function showRange(){
-  recMode='range'; if(recUnsub){ recUnsub(); recUnsub=null; }
-  const start=$('#recStart').value || todayYMD();
-  const end  =$('#recEnd').value   || $('#recStart').value || todayYMD();
-  recRange={start,end}; recLastDoc=null; recHasMore=false;
-  setTableLoading();
-  const {rows,lastDoc,size}=await fetchPage(start,end,null,PAGE_FIRST);
-  const body=$('#recTbody');
-  if(!size){ body.innerHTML = `<tr><td class="c muted" colspan="5">Nessun record.</td></tr>`; $('#recCount').textContent='(0)'; $('#loadMore').disabled=true; return; }
-  body.innerHTML = rows.map(rowHTML).join('');
-  recLastDoc=lastDoc; recHasMore=!!lastDoc; $('#loadMore').disabled=!recHasMore;
-  $('#recCount').textContent = `(${size}${recHasMore?'+':''})`;
+  // suggestions per overlay
+  fillTagSuggestions(tags);
 }
 
 /* ===== Boot ===== */
@@ -595,15 +682,27 @@ document.addEventListener('DOMContentLoaded', ()=>{
     currentUid=u.uid; $('#userLabel').textContent=u.email||u.uid;
     await renderAll();
     buildTagCloud(currentUid);
-    showLatestRealtime(); // default
+    setActiveSeg('today'); showToday(); // default
+
+    // segmented handlers
+    document.querySelectorAll('.segbtn').forEach(b=>{
+      b.addEventListener('click', ()=>{
+        setActiveSeg(b.dataset.mode);
+        if(recMode==='today') showToday();
+        else if(recMode==='yesterday') showYesterday();
+        else if(recMode==='last5') showLastN(5);
+        else if(recMode==='last20') showLastN(20);
+        else if(recMode==='range') showRange(true);
+      });
+    });
   });
 
-  // navigazione giorno
+  // navigazione giorno grafici
   $('#prevDay').addEventListener('click', ()=>{ $('#dayPick').value=addDaysYMD($('#dayPick').value,-1); renderAll(); });
   $('#nextDay').addEventListener('click', ()=>{ $('#dayPick').value=addDaysYMD($('#dayPick').value, 1); renderAll(); });
   $('#dayPick').addEventListener('change', renderAll);
 
-  // periodo
+  // periodo grafici
   $('#perApply').addEventListener('click', ()=> renderPeriod(currentUid));
 
   // gear panel
@@ -632,11 +731,35 @@ document.addEventListener('DOMContentLoaded', ()=>{
     customMap={}; saveCustomMap(customMap); renderMapList(); renderAll(); buildTagCloud(currentUid);
   });
 
-  // tabella attività
-  bindTableEvents();
-  $('#btnLast').addEventListener('click', showLatestRealtime);
-  $('#recRefresh').addEventListener('click', showRange);
+  // tabella
+  bindTableActions();
+  $('#recShow').addEventListener('click', ()=>{ if(recMode!=='range'){ setActiveSeg('range'); } showRange(true); });
+  $('#loadMore').addEventListener('click', ()=>{ if(recMode==='range' && recHasMore) showRange(false); });
+
+  // overlay events
+  $('#cancelEditBtn').addEventListener('click', closeEdit);
+  $('#saveEditBtn').addEventListener('click', saveEdit);
+  $('#deleteEditBtn').addEventListener('click', deleteFromOverlay);
+  $('#editOverlay').addEventListener('click', (e)=>{ if(e.target.id==='editOverlay') closeEdit(); });
+  // scorciatoie tastiera nella modal
+  document.addEventListener('keydown', (e)=>{
+    if(overlay.classList.contains('show')){
+      if(e.key==='Escape'){ e.preventDefault(); closeEdit(); }
+      if((e.key==='s' && (e.metaKey||e.ctrlKey)) || e.key==='Enter'){
+        e.preventDefault(); saveEdit();
+      }
+    }
+  });
 });
+
+/* ===== Orchestrator grafici ===== */
+async function renderAll(){
+  const ymd=$('#dayPick').value;
+  $('#loading').textContent='Caricamento…';
+  await renderDay(currentUid, ymd);
+  await renderPeriod(currentUid);
+  $('#loading').textContent='Pronto';
+}
 </script>
 </body>
 </html>
