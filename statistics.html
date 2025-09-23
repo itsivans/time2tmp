@@ -133,6 +133,23 @@
   @media (max-width: 420px){
     th.actionsCell, td.actionsCell { width: 14ch; }
   }
+
+  /* ===== Barra avanzamento giornata ===== */
+  .dayProg { max-width:420px; margin:0 auto 8px; }
+  .dayProg .head { display:flex; justify-content:space-between; font-size:12px; color:var(--muted); margin-bottom:4px; }
+  .dayProg .bar { height:10px; background:#eef2f7; border-radius:999px; overflow:hidden; }
+  [data-theme="dark"] .dayProg .bar{ background:#1f2732; }
+  .dayProg .fill { height:100%; width:0%; background:linear-gradient(90deg, var(--link), var(--good)); transition:width .3s; }
+
+  /* ===== Non gestibile extra (UI) ===== */
+  .ngx { max-width:420px; margin:10px auto 0; }
+  .ngx .row { display:flex; gap:6px; flex-wrap:wrap; }
+  .ngx input[type="time"] { flex:1 1 110px; padding:6px 8px; border:1px solid var(--line); border-radius:8px; background:transparent; color:var(--text); }
+  .ngx input[type="text"] { flex:1 1 160px; padding:6px 8px; border:1px solid var(--line); border-radius:8px; background:transparent; color:var(--text); }
+  .ngx button { padding:6px 10px; border:1px solid var(--line); border-radius:8px; background:transparent; color:var(--text); cursor:pointer; }
+  .ngx .chips { display:flex; flex-wrap:wrap; gap:6px; margin-top:6px; }
+  .ngx .chip { font-size:12px; border:1px solid var(--warn); color: var(--warn); padding:4px 8px; border-radius:999px; }
+  .ngx .chip button { margin-left:6px; border:none; background:transparent; color:inherit; cursor:pointer; }
 </style>
 </head>
 <body>
@@ -179,6 +196,16 @@
     <h2 class="title">Giorno</h2>
     <div class="row">
       <div class="col">
+
+        <!-- Barra completamento giornata -->
+        <div class="dayProg">
+          <div class="head">
+            <span>Completamento giornata</span>
+            <span id="d_prog_label">—%</span>
+          </div>
+          <div class="bar"><div id="d_prog_fill" class="fill"></div></div>
+        </div>
+
         <div class="chartBox"><canvas id="dailyDonut"></canvas></div>
         <div class="chartNote">Donut: % sul tempo <b>disponibile</b> oggi (escluso Non gestibile).</div>
         <div class="chips">
@@ -191,6 +218,18 @@
           <span id="d_bar_neut" class="neutral" style="width:0%"></span>
           <span id="d_bar_wast" class="bad" style="width:0%"></span>
         </div>
+
+        <!-- Pannello Non gestibile extra -->
+        <div class="ngx">
+          <div class="row">
+            <input type="time" id="ngxFrom" aria-label="Da">
+            <input type="time" id="ngxTo" aria-label="A">
+            <input type="text" id="ngxLabel" placeholder="Nota (opz.)">
+            <button id="ngxAdd">+ Non gestibile</button>
+          </div>
+          <div id="ngxList" class="chips"></div>
+        </div>
+
       </div>
       <div class="col">
         <table>
@@ -348,6 +387,23 @@ function addDaysYMD(ymd, d){ const [y,m,dy]=ymd.split('-').map(Number); const dt
 function fmtHM(m){ const h=Math.floor(m/60),mm=m%60; if(h>0&&mm>0)return `${h}h ${mm}m`; if(h>0)return `${h}h`; return `${mm}m`; }
 function col(uid){ return db.collection(`users/${uid}/activities`); }
 
+/* ===== Extra Non Gestibile (local) =====
+   Stored per-utente e per-data: { [uid]: { [yyyy-mm-dd]: [ {from:'HH:MM', to:'HH:MM', label:''}, ... ] } }
+*/
+const LS_NGX = 'tt_extra_non_map';
+function _loadNgx(){ try{ return JSON.parse(localStorage.getItem(LS_NGX)||'{}'); }catch{ return {}; } }
+function _saveNgx(obj){ localStorage.setItem(LS_NGX, JSON.stringify(obj)); }
+function loadNgxFor(uid, ymd){ const all=_loadNgx(); return ((all[uid]||{})[ymd]||[]); }
+function saveNgxFor(uid, ymd, arr){ const all=_loadNgx(); if(!all[uid]) all[uid]={}; all[uid][ymd]=arr; _saveNgx(all); }
+function minsBetweenHHMM(from,to){
+  const [fh,fm]=String(from||'').split(':').map(Number); const [th,tm]=String(to||'').split(':').map(Number);
+  let a=fh*60+fm, b=th*60+tm; if(isNaN(a)||isNaN(b)) return 0; if(b<a) b+=1440; return Math.min(b-a,1440);
+}
+function clipNgxToDayMins(from,to){
+  const [fh,fm]=String(from||'').split(':').map(Number); const [th,tm]=String(to||'').split(':').map(Number);
+  let a=fh*60+fm, b=th*60+tm; if(isNaN(a)||isNaN(b)) return 0; if(b<a) b+=1440; return Math.max(0, Math.min(b,1440)-Math.max(0,a));
+}
+
 /* ===== Aggregazioni per grafici ===== */
 function buildDayEvents(items, ymd, nextFirstTag){
   const ev=[]; if(items.length){ ev.push({tag:items[0].tag,timestamp:dayStart(ymd)}); items.forEach(it=>ev.push({tag:it.tag,timestamp:it.timestamp}));
@@ -395,7 +451,18 @@ async function renderDay(uid, ymd){
 
   const events=buildDayEvents(items, ymd, nextFirst);
   const perTag=minutesPerTag(events);
-  const totals=splitBuckets(perTag);
+
+  // Base totals (da DB)
+  let totals=splitBuckets(perTag);
+
+  // Somma “Non gestibile extra” locale (solo per il giorno corrente visualizzato)
+  const ngx = loadNgxFor(uid, ymd);
+  let extraNG = 0;
+  for (const b of ngx) extraNG += clipNgxToDayMins(b.from||'', b.to||'');
+  if (extraNG > 0) {
+    totals.non  += extraNG;
+    totals.avail = Math.max(0, 1440 - totals.non);
+  }
 
   destroyChart(dailyDonut);
   dailyDonut=new Chart(document.getElementById('dailyDonut').getContext('2d'),{
@@ -421,6 +488,44 @@ async function renderDay(uid, ymd){
   });
 }
 
+/* ===== UI Non gestibile extra ===== */
+function renderNgxUI(uid, ymd){
+  const list = $('#ngxList');
+  const arr = loadNgxFor(uid, ymd);
+  if (!arr.length) { list.innerHTML = ''; return; }
+  list.innerHTML = '';
+  arr.forEach((b, i)=>{
+    const el = document.createElement('span');
+    el.className = 'chip';
+    el.textContent = `${b.from}–${b.to}${b.label ? ' · '+b.label : ''}`;
+    const del = document.createElement('button');
+    del.textContent = '×';
+    del.title = 'Rimuovi';
+    del.addEventListener('click', ()=>{
+      const cur = loadNgxFor(uid, ymd); cur.splice(i,1); saveNgxFor(uid, ymd, cur);
+      renderNgxUI(uid, ymd); renderDay(uid, ymd);
+    });
+    el.appendChild(del);
+    list.appendChild(el);
+  });
+}
+function bindNgxControls(){
+  $('#ngxAdd').addEventListener('click', ()=>{
+    const from = $('#ngxFrom').value;
+    const to   = $('#ngxTo').value;
+    const label= ($('#ngxLabel').value||'').trim();
+    if (!from || !to) { alert('Inserisci orari Da/A'); return; }
+    const ymd = $('#dayPick').value;
+    const arr = loadNgxFor(currentUid, ymd);
+    arr.push({ from, to, label });
+    saveNgxFor(currentUid, ymd, arr);
+    $('#ngxLabel').value='';
+    renderNgxUI(currentUid, ymd);
+    renderDay(currentUid, ymd);
+  });
+}
+
+/* ===== Periodo ===== */
 async function fetchRange(uid, start, end){
   const snap=await col(uid).where('timestamp','>=',dayStart(start)).where('timestamp','<=',dayEnd(end)).orderBy('timestamp').get();
   const a=[]; snap.forEach(d=>a.push({tag:d.data().tag,timestamp:d.data().timestamp})); return a;
@@ -476,7 +581,6 @@ function toLocalDate(iso){
   const [y,m,d] = iso.slice(0,10).split('-');
   return `${d}-${m}-${y}`;
 }
-
 function toLocalTime(iso){ return iso? iso.slice(11,16):''; }
 
 let currentUid=null;
@@ -494,8 +598,11 @@ function setActiveSeg(mode){
   document.querySelectorAll('.segbtn').forEach(b=> b.classList.toggle('active', b.dataset.mode===mode));
   // abilita controlli intervallo solo in 'range'
   const dis = (mode!=='range');
-  ['recStart','recEnd','recShow'].forEach(id=>{ const el=document.getElementById(id); el.disabled = dis; el.style.opacity = dis ? 0.66 : 1;
- });
+  ['recStart','recEnd','recShow'].forEach(id=>{
+    const el=document.getElementById(id);
+    el.disabled = dis;
+    el.style.opacity = dis ? 0.66 : 1;
+  });
 }
 
 function rowHTML(r){
@@ -662,11 +769,8 @@ async function saveEdit(){
     // aggiorna DOM (se la riga è presente)
     const tr=document.querySelector(`tr[data-id="${currentEditId}"]`);
     if(tr){
-      {
-  const [y,m,d] = ts.slice(0,10).split('-');
-  tr.children[0].textContent = `${d}-${m}-${y}`;
-}
-
+      const [y,m,d] = ts.slice(0,10).split('-');
+      tr.children[0].textContent = `${d}-${m}-${y}`;
       tr.children[1].textContent = ts.slice(11,16);
       tr.children[2].textContent = tag;
       tr.children[3].textContent = activity;
@@ -704,6 +808,31 @@ async function buildTagCloud(uid){
   });
   // suggestions per overlay
   fillTagSuggestions(tags);
+}
+
+/* ===== Barra avanzamento giornata (live per oggi) ===== */
+let progTimer = null;
+function dayProgress(ymd){
+  const fill = $('#d_prog_fill');
+  const lab  = $('#d_prog_label');
+  const today = todayYMD();
+  if (ymd !== today) {
+    fill.style.width = '100%';
+    lab.textContent = '100%';
+    if (progTimer) { clearInterval(progTimer); progTimer = null; }
+    return;
+  }
+  function tick(){
+    const now = new Date();
+    const start = new Date(now); start.setHours(0,0,0,0);
+    const end   = new Date(now); end.setHours(23,59,59,999);
+    const perc  = Math.max(0, Math.min(100, Math.round(((now - start) / (end - start))*100 )));
+    fill.style.width = perc + '%';
+    lab.textContent  = perc + '%';
+  }
+  tick();
+  if (progTimer) clearInterval(progTimer);
+  progTimer = setInterval(tick, 60*1000);
 }
 
 /* ===== Boot ===== */
@@ -783,6 +912,9 @@ document.addEventListener('DOMContentLoaded', ()=>{
       }
     }
   });
+
+  // pannello Non gestibile extra
+  bindNgxControls();
 });
 
 /* ===== Orchestrator grafici ===== */
@@ -791,6 +923,8 @@ async function renderAll(){
   $('#loading').textContent='Caricamento…';
   await renderDay(currentUid, ymd);
   await renderPeriod(currentUid);
+  renderNgxUI(currentUid, ymd);
+  dayProgress(ymd);
   $('#loading').textContent='Pronto';
 }
 </script>
