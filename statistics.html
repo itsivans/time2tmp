@@ -494,7 +494,8 @@ function setActiveSeg(mode){
   document.querySelectorAll('.segbtn').forEach(b=> b.classList.toggle('active', b.dataset.mode===mode));
   // abilita controlli intervallo solo in 'range'
   const dis = (mode!=='range');
-  ['recStart','recEnd','recShow'].forEach(id=>{ const el=document.getElementById(id); el.disabled = dis; el.style.opacity = dis?.66:1; });
+  ['recStart','recEnd','recShow'].forEach(id=>{ const el=document.getElementById(id); el.disabled = dis; el.style.opacity = dis ? 0.66 : 1;
+ });
 }
 
 function rowHTML(r){
