@@ -1,0 +1,511 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8" />
+  <title>Activity Tracker — Accesso</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" href="icon-192.png">
+  <meta name="theme-color" content="#2196f3">
+
+  <!-- Pre-init TEMA: evita flash errato -->
+  <script>
+    (function(){
+      const KEY='tt_theme';
+      const saved = localStorage.getItem(KEY);
+      const prefDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+      const theme = saved || (prefDark ? 'dark' : 'light');
+      document.documentElement.setAttribute('data-theme', theme);
+    })();
+  </script>
+
+  <!-- Firebase (compat) -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+
+  <style>
+    /* ===== Theme Vars ===== */
+    :root[data-theme="light"]{
+      --bg:#ffffff; --text:#111; --muted:#666; --card:#ffffff; --border:#ddd;
+      --primary:#2196f3; --toast:#323232; --toastText:#fff;
+      --chip-bg:rgba(0,0,0,.06); --chip-text:#333;
+    }
+    :root[data-theme="dark"]{
+      --bg:#121212; --text:#eaeaea; --muted:#aaa; --card:#1a1a1a; --border:#2a2a2a;
+      --primary:#2196f3; --toast:#222; --toastText:#eaeaea;
+      --chip-bg:rgba(255,255,255,.10); --chip-text:#ddd;
+    }
+
+    *{ box-sizing:border-box; -webkit-tap-highlight-color: transparent; }
+    html, body { height: 100%; }
+    body {
+      margin:0; padding:12px;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial;
+      color: var(--text); background: var(--bg);
+      overflow-x: hidden;
+      padding-left: max(12px, env(safe-area-inset-left));
+      padding-right: max(12px, env(safe-area-inset-right));
+    }
+    .container{ width:100%; max-width:760px; margin:0 auto; }
+
+    input, select, button {
+      width:100%; padding:12px; margin:6px 0; font-size:16px;
+      border:1px solid var(--border); border-radius:10px; background:transparent; color:var(--text);
+    }
+    button{ cursor:pointer; }
+
+    .card{
+      background:var(--card); border:1px solid var(--border); border-radius:12px;
+      padding:12px; margin:12px 0;
+    }
+    .muted{ color:var(--muted); font-size:14px; }
+    .hidden{ display:none !important; }
+
+    .row{ display:flex; flex-wrap:wrap; gap:8px; }
+    .row > *{ flex:1 1 240px; min-width:0; }
+    @media (max-width:420px){ .row > *{ flex-basis:100%; } }
+
+    /* Titoli e microcopy centrati per mobile */
+    .card h3{ text-align:center; margin:6px 0 10px; }
+    #msg{ text-align:center; }
+
+    /* Aggiungi (centrato, grande) */
+    .addWrap{ display:flex; justify-content:center; }
+    #addBtn{
+      width:min(560px,100%); min-height:52px; border:none; border-radius:12px;
+      background:var(--primary); color:#fff; font-weight:700;
+    }
+
+    /* Pulsante link principale */
+    .link{
+      background:var(--primary); color:#fff; border:none; border-radius:10px;
+      margin-top:16px; font-weight:bold; width:100%; min-height:48px;
+    }
+    a[href="statistics.html"]{ display:block; }
+
+    /* Tools in alto a destra: tema + chip utente */
+    .top-tools{
+      position:fixed; top:8px; right:8px; z-index:1000;
+      display:flex; gap:8px; align-items:center;
+    }
+    .icon-btn{
+      min-width:40px; min-height:40px;
+      display:inline-flex; align-items:center; justify-content:center;
+      border:1px solid var(--border); border-radius:999px;
+      background:var(--card); color:var(--text); font-size:18px; cursor:pointer;
+      box-shadow:0 2px 8px rgba(0,0,0,.06);
+    }
+
+    .statuschip{
+      display:none; align-items:center; gap:8px;
+      background: var(--chip-bg); color: var(--chip-text);
+      padding: 6px 12px; border-radius: 999px; font-size:13px; line-height:1;
+      box-shadow: 0 2px 8px rgba(0,0,0,.08);
+    }
+    .statuschip.show{ display:inline-flex; }
+    .who{ cursor:pointer; user-select:none; }
+    #logoutBtn{ border:none; background:transparent; font-size:16px; line-height:1; cursor:pointer; }
+
+    /* Nick popover */
+    .nickpop{
+      position:fixed; top:56px; right:8px; z-index:1001;
+      display:none; width:min(320px,92vw);
+      background:var(--card); color:var(--text);
+      border:1px solid var(--border); border-radius:12px; padding:12px;
+      box-shadow:0 10px 30px rgba(0,0,0,.18);
+    }
+    .nickpop.show{ display:block; }
+    .sm{ width:auto; padding:10px 14px; border:none; border-radius:10px; background:#eaeaea; color:#111; cursor:pointer; }
+    :root[data-theme="dark"] .sm{ background:#2a2a2a; color:#eaeaea; }
+    .sm.primary{ background:var(--primary); color:#fff; }
+    .sm.ghost{ background:#f1f1f1; }
+    :root[data-theme="dark"] .sm.ghost{ background:#1f1f1f; }
+
+    /* Toast */
+    #toast{
+      position:fixed; left:50%; bottom:max(24px, calc(env(safe-area-inset-bottom) + 12px));
+      transform:translateX(-50%); background:var(--toast); color:var(--toastText);
+      padding:10px 14px; border-radius:10px; opacity:0; pointer-events:none; transition:opacity .2s, transform .2s; z-index:9999;
+    }
+    #toast.show{ opacity:1; transform:translateX(-50%) translateY(-6px); }
+
+    /* Splash pre-auth */
+    .splash{
+      position:fixed; inset:0; display:flex; align-items:center; justify-content:center;
+      background:var(--bg); color:var(--muted); font:14px/1.2 system-ui, Arial;
+      z-index:2000;
+    }
+    .preauth #authBox, .preauth #appBox, .preauth .top-tools{ display:none !important; }
+    #splash{ display:none; }
+    .preauth #splash{ display:flex; }
+
+    /* Ultimo record */
+    .lastrecord{ text-align:center; font-size:12px; opacity:.85; margin-top:6px; }
+    .lastrecord b{ font-weight:600; }
+  </style>
+</head>
+<body class="preauth">
+  <div class="container">
+    <noscript>
+      <div class="card" style="margin-top:20px">
+        <strong>⚠️ JavaScript disabilitato.</strong> L'app richiede JavaScript per funzionare.
+      </div>
+    </noscript>
+
+    <!-- Splash -->
+    <div id="splash" class="splash" aria-live="polite">Avvio…</div>
+
+    <!-- TOOLS (tema + chip) -->
+    <div class="top-tools">
+      <button id="themeBtn" class="icon-btn" title="Tema">🌙</button>
+      <div id="statuschip" class="statuschip" aria-live="polite">
+        <span id="who" class="who" title="Clicca per impostare un nickname (solo su questo dispositivo)"></span>
+        <button id="logoutBtn" title="Logout" aria-label="Logout">🚪</button>
+      </div>
+    </div>
+
+    <!-- Popover nickname -->
+    <div id="nickPop" class="nickpop" role="dialog" aria-modal="true" aria-labelledby="nickTitle">
+      <div id="nickTitle" class="muted" style="margin-bottom:6px;">Nickname locale (non salvato nel cloud)</div>
+      <div class="row">
+        <input id="nickInput" type="text" placeholder="Il tuo nickname (solo qui)">
+        <button id="saveNickBtn" class="sm primary">Salva</button>
+        <button id="clearNickBtn" class="sm ghost">Rimuovi</button>
+        <button id="cancelNickBtn" class="sm">Chiudi</button>
+      </div>
+    </div>
+
+    <!-- LOGIN -->
+    <div id="authBox" class="card hidden" style="margin-top: 56px;">
+      <h3>🔐 Accedi</h3>
+      <div class="row">
+        <input id="email" type="email" placeholder="Email" autocomplete="email" inputmode="email">
+        <input id="pass" type="password" placeholder="Password" autocomplete="current-password">
+      </div>
+      <div class="row">
+        <button id="loginBtn">Accedi</button>
+        <button id="signupBtn">Registrati</button>
+      </div>
+      <p class="muted" style="text-align:center">Devi essere loggato per inserire attività e vedere le statistiche.</p>
+    </div>
+
+    <!-- APP -->
+    <div id="appBox" class="hidden">
+      <div class="card" style="margin-top: 56px;">
+        <h3>📥 Inserisci attività</h3>
+
+        <input type="text" id="activity" placeholder="Attività..." inputmode="text">
+
+        <div class="row">
+          <input type="datetime-local" id="dateTime">
+          <select id="tag">
+            <option value="">--Tag--</option>
+          </select>
+        </div>
+
+        <div class="addWrap"><button id="addBtn">➕ Aggiungi</button></div>
+
+        <!-- Ultimo record (microcopy) -->
+        <div id="lastRecord" class="muted lastrecord" aria-live="polite"></div>
+
+        <div id="msg" class="muted" style="margin-top:6px"></div>
+      </div>
+
+      <a href="statistics.html"><button class="link">📊 Vai alle statistiche</button></a>
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div id="toast"></div>
+
+  <script>
+    /* ===== Firebase ===== */
+    const firebaseConfig = {
+      apiKey: "AIzaSyDEq8aUhdBPcjYM6H6909DldXAdjhRNWbI",
+      authDomain: "time-ff7ed.firebaseapp.com",
+      projectId: "time-ff7ed",
+      storageBucket: "time-ff7ed.appspot.com",
+      messagingSenderId: "842285944784",
+      appId: "1:842285944784:web:de483548153abc956033d5",
+      measurementId: "G-ZR0BNWGVXJ"
+    };
+    if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+
+    firebase.firestore().enablePersistence({synchronizeTabs:true}).catch(e=>{
+      console.warn('Persistence non attiva:', e.code);
+    });
+
+    const auth = firebase.auth();
+    const db   = firebase.firestore();
+
+    /* ===== Tema ===== */
+    const THEME_KEY='tt_theme';
+    const themeBtn = document.getElementById('themeBtn');
+    function applyTheme(t){
+      document.documentElement.setAttribute('data-theme', t);
+      localStorage.setItem(THEME_KEY, t);
+      themeBtn.textContent = (t==='dark' ? '☀️' : '🌙');
+      // aggiorna meta theme-color (utile in PWA)
+      const meta = document.querySelector('meta[name="theme-color"]');
+      if (meta) meta.setAttribute('content', t==='dark' ? '#0b1118' : '#2196f3');
+    }
+    (function initTheme(){
+      const cur = document.documentElement.getAttribute('data-theme') || 'light';
+      applyTheme(cur);
+    })();
+    themeBtn.addEventListener('click', ()=>{
+      const cur = document.documentElement.getAttribute('data-theme') || 'light';
+      applyTheme(cur==='dark' ? 'light' : 'dark');
+    });
+
+    /* ===== Helpers UI ===== */
+    const $ = s => document.querySelector(s);
+    const authBox    = $('#authBox');
+    const appBox     = $('#appBox');
+    const statuschip = $('#statuschip');
+    const whoEl      = $('#who');
+    const msg        = $('#msg');
+    const toastEl    = $('#toast');
+    const nickPop    = $('#nickPop');
+    const nickInput  = $('#nickInput');
+    const lastEl     = $('#lastRecord');
+
+    const NICK_KEY = 'timeNickname';
+    const LAST_KEY = 'tt_last_rec';
+
+    function setMsg(t){ msg.textContent = t || ''; }
+    function showToast(text){
+      toastEl.textContent = text;
+      toastEl.classList.add('show');
+      setTimeout(()=>toastEl.classList.remove('show'), 1600);
+    }
+    function getLocalISODateTimeNow(){
+      const now = new Date(); now.setSeconds(0,0);
+      const tz = -now.getTimezoneOffset();
+      return new Date(now.getTime()+tz*60000).toISOString().slice(0,16);
+    }
+    function loadNick(){ try { return localStorage.getItem(NICK_KEY) || ''; } catch { return ''; } }
+    function saveNick(v){ try { localStorage.setItem(NICK_KEY, v||''); } catch {} }
+    function clearNick(){ try { localStorage.removeItem(NICK_KEY); } catch {} }
+    function nameFromEmail(email){ return (email || '').split('@')[0]; }
+    function updateWho(user){
+      const nick = loadNick().trim();
+      whoEl.textContent = nick || nameFromEmail(user.email) || 'utente';
+    }
+    function toggleNickPop(show){
+      if (show) {
+        const user = auth.currentUser;
+        const current = (loadNick().trim()) || (user ? nameFromEmail(user.email) : '');
+        nickInput.value = current;
+        nickPop.classList.add('show');
+      } else {
+        nickPop.classList.remove('show');
+      }
+    }
+
+    /* ===== Tag config (scalabile in codice) ===== */
+    const TAGS = [
+      { id: "Entertainment", emoji: "🎬" },
+      { id: "Survive",       emoji: "💼" },
+      { id: "Study",         emoji: "📚" },
+      { id: "Work",          emoji: "💻" },
+      { id: "Nut",           emoji: "🥜" },
+      { id: "Slavery",       emoji: "🧱" },
+      { id: "Productivity",  emoji: "⚙️" },
+      { id: "Waste",         emoji: "🗑️" },
+      { id: "Chess",         emoji: "♟️" },
+      { id: "Gym",           emoji: "🏋️" },
+      { id: "Bike",          emoji: "🏍️" },
+      { id: "Holiday",       emoji: "🏝️" },
+      { id: "Chinese",       emoji: "🇨🇳" },
+      { id: "Sleep",         emoji: "😴" },
+      { id: "Book",          emoji: "📖" }
+    ];
+
+    const TAG_EMOJI = TAGS.reduce((acc, t) => {
+      acc[t.id] = t.emoji;
+      return acc;
+    }, {});
+
+    function tagWithEmoji(tag){
+      const emoji = TAG_EMOJI[tag];
+      return emoji ? `${emoji} ${tag}` : (tag || '');
+    }
+
+    function buildTagSelect(){
+      const select = document.getElementById('tag');
+      if (!select) return;
+
+      // placeholder
+      let placeholder = select.querySelector('option[value=""]');
+      if (!placeholder) {
+        placeholder = document.createElement('option');
+        placeholder.value = '';
+        placeholder.textContent = '--Tag--';
+      }
+
+      // reset
+      select.innerHTML = '';
+      select.appendChild(placeholder);
+
+      TAGS.forEach(t => {
+        const opt = document.createElement('option');
+        opt.value = t.id;                         // quello che vai a salvare nel DB
+        opt.textContent = `${t.emoji} ${t.id}`;   // quello che vedi a schermo
+        select.appendChild(opt);
+      });
+    }
+
+    /* ===== Ultimo record (helpers) ===== */
+    function fmt(ts){
+      try{
+        const d = new Date(ts);
+        if(!isNaN(d)) return d.toLocaleString('it-IT', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' });
+      }catch{}
+      return ts;
+    }
+    function setLast(rec){
+      if(!rec){ lastEl.textContent=''; return; }
+      const {activity, tag, timestamp} = rec;
+      const safeActivity = (activity||'').replaceAll('<','&lt;');
+      const prettyTag = tag ? tagWithEmoji(tag) : '-';
+      lastEl.innerHTML = `Ultimo inserito: <b>«${safeActivity}»</b> — ${prettyTag} • ${fmt(timestamp||'')}`;
+    }
+    function saveLast(rec){ try{ localStorage.setItem(LAST_KEY, JSON.stringify(rec)); }catch{} }
+    function loadLast(){ try{ const v = localStorage.getItem(LAST_KEY); return v? JSON.parse(v): null; }catch{ return null } }
+
+    async function fetchLastFromDb(uid){
+      try{
+        const snap = await db.collection(`users/${uid}/activities`).orderBy('timestamp','desc').limit(1).get();
+        if(!snap.empty){ const data = snap.docs[0].data(); setLast(data); saveLast(data); }
+      }catch(e){ console.warn('Errore lettura ultimo record:', e.message); }
+    }
+
+    /* ===== Auth state (anti-flash) ===== */
+    let firstAuthEventHandled = false;
+    auth.onAuthStateChanged(async user => {
+      if (user) {
+        authBox.classList.add('hidden');
+        appBox.classList.remove('hidden');
+        statuschip.classList.add('show');
+        updateWho(user);
+
+        // costruisci select tag (caso utente già loggato)
+        buildTagSelect();
+
+        const dt = $('#dateTime');
+        if (!dt.value) dt.value = getLocalISODateTimeNow();
+
+        const act = $('#activity');
+        act.onkeydown = (e) => { if (e.key === 'Enter') $('#addBtn').click(); };
+        act.onfocus   = () => { if (!dt.value) dt.value = getLocalISODateTimeNow(); };
+
+        // mostra ultimo record (prima locale, poi da DB)
+        setLast(loadLast());
+        await fetchLastFromDb(user.uid);
+
+      } else {
+        appBox.classList.add('hidden');
+        authBox.classList.remove('hidden');
+        statuschip.classList.remove('show');
+        toggleNickPop(false);
+        setLast(null);
+      }
+
+      if (!firstAuthEventHandled) {
+        document.body.classList.remove('preauth');
+        firstAuthEventHandled = true;
+      }
+    });
+
+    /* ===== Auth actions ===== */
+    $('#loginBtn').onclick = async () => {
+      const email = $('#email').value.trim();
+      const pass  = $('#pass').value;
+      if (!email || !pass) return setMsg('Inserisci email e password.');
+      try { await auth.signInWithEmailAndPassword(email, pass); setMsg('Accesso eseguito.'); }
+      catch(e){ console.error(e); setMsg(mapAuthError(e.code, e.message)); }
+    };
+    $('#signupBtn').onclick = async () => {
+      const email = $('#email').value.trim();
+      const pass  = $('#pass').value;
+      if (!email || !pass) return setMsg('Inserisci email e password.');
+      try { await auth.createUserWithEmailAndPassword(email, pass); await auth.currentUser.sendEmailVerification(); setMsg('Registrazione ok. Verifica la tua email.'); }
+      catch(e){ console.error(e); setMsg(mapAuthError(e.code, e.message)); }
+    };
+    $('#logoutBtn').onclick = () => {
+      if (!confirm('Sei sicuro di voler uscire?')) return;
+      auth.signOut();
+    };
+    function mapAuthError(code, fallback){
+      const map = {
+        'auth/invalid-email': 'Email non valida.',
+        'auth/user-not-found': 'Utente non trovato.',
+        'auth/wrong-password': 'Password errata.',
+        'auth/email-already-in-use': 'Email già in uso.',
+        'auth/too-many-requests': 'Troppe richieste, riprova più tardi.'
+      };
+      return map[code] || fallback || 'Errore.';
+    }
+
+    /* ===== Nickname (solo locale) ===== */
+    whoEl.onclick = () => toggleNickPop(true);
+    $('#cancelNickBtn').onclick = () => toggleNickPop(false);
+    $('#saveNickBtn').onclick = () => {
+      saveNick(nickInput.value.trim());
+      toggleNickPop(false);
+      if (auth.currentUser) updateWho(auth.currentUser);
+      showToast('✅ Nickname aggiornato');
+    };
+    $('#clearNickBtn').onclick = () => {
+      clearNick();
+      toggleNickPop(false);
+      if (auth.currentUser) updateWho(auth.currentUser);
+      showToast('ℹ️ Nickname rimosso');
+    };
+    document.addEventListener('click', (e)=>{
+      if (!nickPop.classList.contains('show')) return;
+      const withinPop = nickPop.contains(e.target);
+      const clickedWho = whoEl.contains(e.target);
+      if (!withinPop && !clickedWho) toggleNickPop(false);
+    });
+
+    /* ===== Add activity ===== */
+    $('#addBtn').onclick = async () => {
+      const user = auth.currentUser;
+      if (!user) return setMsg('Devi essere loggato.');
+
+      const activity = $('#activity').value.trim();
+      const tag      = $('#tag').value;
+      let   dateTime = $('#dateTime').value;
+
+      if (!activity || !tag) return setMsg('Inserisci attività e tag!');
+      if (!dateTime) dateTime = getLocalISODateTimeNow();
+
+      const record = { activity, tag, timestamp: dateTime };
+
+      try {
+        await db.collection(`users/${user.uid}/activities`).add(record);
+        $('#activity').value = ''; $('#dateTime').value = ''; $('#tag').value = '';
+        setMsg('Attività salvata.'); showToast('✅ Attività inserita');
+        // aggiorna microcopy
+        setLast(record); saveLast(record);
+      } catch (e) {
+        console.error(e);
+        setMsg('Errore nel salvataggio: ' + e.message);
+      }
+    };
+
+    /* ===== Service Worker ===== */
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('service-worker.js')
+        .then(()=>console.log('✅ Service Worker registrato'))
+        .catch(err=>console.warn('❌ SW errore:', err));
+    }
+
+    // Costruisci select anche all'avvio (es. se l'utente è già loggato)
+    buildTagSelect();
+  </script>
+</body>
+</html>
