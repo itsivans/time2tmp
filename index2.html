@@ -48,7 +48,7 @@
       padding-right: max(12px, env(safe-area-inset-right));
     }
 
-    /* Container a tutta altezza, layout a colonna */
+    /* Container full-height, layout colonna */
     .container{
       width:100%;
       max-width:760px;
@@ -93,7 +93,7 @@
     }
     a[href="statistics.html"]{
       display:block;
-      margin-top:auto;        /* spinge il bottone in fondo alla pagina */
+      margin-top:auto; /* spinge il bottone in fondo alla pagina */
     }
 
     /* Tools in alto a destra: tema + chip utente */
@@ -156,14 +156,25 @@
     .lastrecord{ text-align:center; font-size:12px; opacity:.85; margin-top:6px; }
     .lastrecord b{ font-weight:600; }
 
-    /* AppBox riempie lo spazio libero (per spingere il bottone in basso) */
+    /* Area APP riempie lo spazio libero */
     #appBox{
       flex:1;
       display:flex;
       flex-direction:column;
     }
-    #appBox > .card{
-      margin-top:56px;
+
+    /* Wrapper per centrare verticalmente la card */
+    .app-inner{
+      flex:1;
+      display:flex;
+      flex-direction:column;
+      justify-content:center;
+      padding-top:72px;   /* spazio per non sovrapporsi ai tools fissi */
+      padding-bottom:16px;
+    }
+
+    .app-inner .card{
+      margin:0; /* niente margin-top, è centrata dal flex */
     }
   </style>
 </head>
@@ -214,24 +225,26 @@
 
     <!-- APP -->
     <div id="appBox" class="hidden">
-      <div class="card">
-        <h3>📥 Inserisci attività</h3>
+      <div class="app-inner">
+        <div class="card">
+          <h3>📥 Inserisci attività</h3>
 
-        <input type="text" id="activity" placeholder="Attività..." inputmode="text">
+          <input type="text" id="activity" placeholder="Attività..." inputmode="text">
 
-        <div class="row">
-          <input type="datetime-local" id="dateTime">
-          <select id="tag">
-            <option value="">--Tag--</option>
-          </select>
+          <div class="row">
+            <input type="datetime-local" id="dateTime">
+            <select id="tag">
+              <option value="">--Tag--</option>
+            </select>
+          </div>
+
+          <div class="addWrap"><button id="addBtn">➕ Aggiungi</button></div>
+
+          <!-- Ultimo record (microcopy) -->
+          <div id="lastRecord" class="muted lastrecord" aria-live="polite"></div>
+
+          <div id="msg" class="muted" style="margin-top:6px"></div>
         </div>
-
-        <div class="addWrap"><button id="addBtn">➕ Aggiungi</button></div>
-
-        <!-- Ultimo record (microcopy) -->
-        <div id="lastRecord" class="muted lastrecord" aria-live="polite"></div>
-
-        <div id="msg" class="muted" style="margin-top:6px"></div>
       </div>
 
       <a href="statistics.html"><button class="link">📊 Vai alle statistiche</button></a>
