@@ -47,7 +47,16 @@
       padding-left: max(12px, env(safe-area-inset-left));
       padding-right: max(12px, env(safe-area-inset-right));
     }
-    .container{ width:100%; max-width:760px; margin:0 auto; }
+
+    /* Container a tutta altezza, layout a colonna */
+    .container{
+      width:100%;
+      max-width:760px;
+      margin:0 auto;
+      min-height:100vh;
+      display:flex;
+      flex-direction:column;
+    }
 
     input, select, button {
       width:100%; padding:12px; margin:6px 0; font-size:16px;
@@ -82,7 +91,10 @@
       background:var(--primary); color:#fff; border:none; border-radius:10px;
       margin-top:16px; font-weight:bold; width:100%; min-height:48px;
     }
-    a[href="statistics.html"]{ display:block; }
+    a[href="statistics.html"]{
+      display:block;
+      margin-top:auto;        /* spinge il bottone in fondo alla pagina */
+    }
 
     /* Tools in alto a destra: tema + chip utente */
     .top-tools{
@@ -143,6 +155,16 @@
     /* Ultimo record */
     .lastrecord{ text-align:center; font-size:12px; opacity:.85; margin-top:6px; }
     .lastrecord b{ font-weight:600; }
+
+    /* AppBox riempie lo spazio libero (per spingere il bottone in basso) */
+    #appBox{
+      flex:1;
+      display:flex;
+      flex-direction:column;
+    }
+    #appBox > .card{
+      margin-top:56px;
+    }
   </style>
 </head>
 <body class="preauth">
@@ -192,7 +214,7 @@
 
     <!-- APP -->
     <div id="appBox" class="hidden">
-      <div class="card" style="margin-top: 56px;">
+      <div class="card">
         <h3>📥 Inserisci attività</h3>
 
         <input type="text" id="activity" placeholder="Attività..." inputmode="text">
@@ -246,7 +268,6 @@
       document.documentElement.setAttribute('data-theme', t);
       localStorage.setItem(THEME_KEY, t);
       themeBtn.textContent = (t==='dark' ? '☀️' : '🌙');
-      // aggiorna meta theme-color (utile in PWA)
       const meta = document.querySelector('meta[name="theme-color"]');
       if (meta) meta.setAttribute('content', t==='dark' ? '#0b1118' : '#2196f3');
     }
@@ -337,7 +358,6 @@
       const select = document.getElementById('tag');
       if (!select) return;
 
-      // placeholder
       let placeholder = select.querySelector('option[value=""]');
       if (!placeholder) {
         placeholder = document.createElement('option');
@@ -345,14 +365,13 @@
         placeholder.textContent = '--Tag--';
       }
 
-      // reset
       select.innerHTML = '';
       select.appendChild(placeholder);
 
       TAGS.forEach(t => {
         const opt = document.createElement('option');
-        opt.value = t.id;                         // quello che vai a salvare nel DB
-        opt.textContent = `${t.emoji} ${t.id}`;   // quello che vedi a schermo
+        opt.value = t.id;
+        opt.textContent = `${t.emoji} ${t.id}`;
         select.appendChild(opt);
       });
     }
@@ -391,7 +410,6 @@
         statuschip.classList.add('show');
         updateWho(user);
 
-        // costruisci select tag (caso utente già loggato)
         buildTagSelect();
 
         const dt = $('#dateTime');
@@ -401,7 +419,6 @@
         act.onkeydown = (e) => { if (e.key === 'Enter') $('#addBtn').click(); };
         act.onfocus   = () => { if (!dt.value) dt.value = getLocalISODateTimeNow(); };
 
-        // mostra ultimo record (prima locale, poi da DB)
         setLast(loadLast());
         await fetchLastFromDb(user.uid);
 
@@ -489,7 +506,6 @@
         await db.collection(`users/${user.uid}/activities`).add(record);
         $('#activity').value = ''; $('#dateTime').value = ''; $('#tag').value = '';
         setMsg('Attività salvata.'); showToast('✅ Attività inserita');
-        // aggiorna microcopy
         setLast(record); saveLast(record);
       } catch (e) {
         console.error(e);
