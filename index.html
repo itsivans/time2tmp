@@ -27,7 +27,8 @@
   <!-- External JavaScript modules -->
   <script src="js/config.js"></script>
   <script src="js/utils.js"></script>
-  <script src="js/theme.js"></script></script>
+  <script src="js/theme.js"></script>
+  <script src="js/settings-service.js"></script>
 
   <style>
     /* ===== Theme Vars ===== */
@@ -200,27 +201,14 @@
       <div class="card" style="margin-top: 56px;">
         <h3>📥 Inserisci attività</h3>
 
-        <input type="text" id="activity" placeholder="Attività..." inputmode="text">
+        <input type="text" id="activity" placeholder="Attività..." inputmode="text" list="activitySuggestions" autocomplete="off">
+        <datalist id="activitySuggestions"></datalist>
 
         <div class="row">
           <input type="datetime-local" id="dateTime">
           <select id="tag">
             <option value="">--Tag--</option>
-            <option>Entertainment</option>
-            <option>Survive</option>
-            <option>Study</option>
-            <option>Work</option>
-            <option>Nut</option>
-            <option>Slavery</option>
-            <option>Productivity</option>
-            <option>Waste</option>
-            <option>Chess</option>
-            <option>Gym</option>
-            <option>Bike</option>
-            <option>Holiday</option>
-            <option>Chinese</option>
-            <option>Sleep</option>
-            <option>Book</option>
+            <!-- Tags loaded dynamically from user settings -->
           </select>
         </div>
 
@@ -233,6 +221,7 @@
       </div>
 
       <a href="pages/statistics.html"><button class="link">📊 Vai alle statistiche</button></a>
+      <a href="pages/settings.html"><button class="link" style="background:var(--card);color:var(--text);border:1px solid var(--border);">⚙️ Impostazioni</button></a>
     </div>
   </div>
 
@@ -285,6 +274,74 @@
       }
     }
 
+    /* ===== Activity Autocomplete ===== */
+    const activityCounts = new Map(); // activity -> count
+    const MIN_COUNT = 2; // Only show activities used at least this many times
+
+    async function loadActivitySuggestions(uid) {
+      await safeFirebaseCall(
+        async () => {
+          const snap = await db.collection(`users/${uid}/activities`)
+            .orderBy('timestamp', 'desc')
+            .limit(200)
+            .get();
+
+          snap.forEach(doc => {
+            const activity = (doc.data().activity || '').trim();
+            if (activity) {
+              activityCounts.set(activity, (activityCounts.get(activity) || 0) + 1);
+            }
+          });
+
+          updateSuggestionsDatalist();
+        },
+        'Errore caricamento suggerimenti'
+      );
+    }
+
+    function updateSuggestionsDatalist() {
+      const datalist = $('#activitySuggestions');
+      datalist.innerHTML = '';
+
+      // Filter: only activities used at least MIN_COUNT times
+      // Sort: by frequency (most used first)
+      const frequent = Array.from(activityCounts.entries())
+        .filter(([_, count]) => count >= MIN_COUNT)
+        .sort((a, b) => b[1] - a[1]) // Sort by count descending
+        .map(([activity]) => activity);
+
+      frequent.forEach(activity => {
+        const option = document.createElement('option');
+        option.value = activity;
+        datalist.appendChild(option);
+      });
+    }
+
+    function addActivitySuggestion(activity) {
+      const trimmed = (activity || '').trim();
+      if (trimmed) {
+        activityCounts.set(trimmed, (activityCounts.get(trimmed) || 0) + 1);
+        updateSuggestionsDatalist();
+      }
+    }
+
+    /* ===== Tag Dropdown (from SettingsService) ===== */
+    function populateTagDropdown() {
+      const select = $('#tag');
+      const tags = SettingsService.getAllTags();
+
+      // Keep placeholder, clear rest
+      select.innerHTML = '<option value="">--Tag--</option>';
+
+      // Add tags from settings
+      tags.forEach(tag => {
+        const option = document.createElement('option');
+        option.value = tag.name;
+        option.textContent = tag.name;
+        select.appendChild(option);
+      });
+    }
+
     /* ===== Last Record Display (with sanitization) ===== */
     function setLast(rec){
       if(!rec){ lastEl.textContent=''; return; }
@@ -329,12 +386,29 @@
         setLast(loadLast());
         await fetchLastFromDb(user.uid);
 
+        // Load activity suggestions for autocomplete
+        await loadActivitySuggestions(user.uid);
+
+        // Load user settings and populate tag dropdown
+        await SettingsService.loadSettings(user.uid, () => {
+          // Re-populate tags when settings change (real-time sync)
+          populateTagDropdown();
+        });
+        populateTagDropdown();
+
+        // Migrate localStorage settings (one-time)
+        const migrated = await SettingsService.migrateLocalStorageSettings(user.uid);
+        if (migrated) {
+          showToast('✅ Impostazioni tag sincronizzate nel cloud');
+        }
+
       } else {
         appBox.classList.add('hidden');
         authBox.classList.remove('hidden');
         statuschip.classList.remove('show');
         toggleNickPop(false);
         setLast(null);
+        SettingsService.cleanupSettings();
       }
 
       if (!firstAuthEventHandled) {
@@ -439,6 +513,7 @@
         showToast('✅ Attività inserita');
         setLast(record);
         saveLast(record);
+        addActivitySuggestion(activity); // Add to autocomplete suggestions
       }
     };
 

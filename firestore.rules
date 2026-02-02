@@ -40,6 +40,15 @@ service cloud.firestore {
           && request.resource.data.tag.size() <= 50;
         allow delete: if isOwner(userId);
       }
+
+      // Settings sub-collection (user preferences, custom tags)
+      match /settings/{settingId} {
+        allow read: if isOwner(userId);
+        allow create, update: if isOwner(userId)
+          && (request.resource.data.theme == null || request.resource.data.theme in ['light', 'dark', 'system'])
+          && (request.resource.data.language == null || request.resource.data.language is string);
+        allow delete: if isOwner(userId);
+      }
     }
 
     // Deny all other access by default

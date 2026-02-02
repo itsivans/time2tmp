@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html lang="it" data-theme="light">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Impostazioni</title>
+
+<!-- Pre-init theme -->
+<script>
+  (function(){
+    const saved = localStorage.getItem('tt_theme');
+    const prefDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+    const theme = saved || (prefDark ? 'dark' : 'light');
+    document.documentElement.setAttribute('data-theme', theme);
+  })();
+</script>
+
+<!-- Firebase (compat) -->
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+
+<!-- External JavaScript modules -->
+<script src="../js/config.js"></script>
+<script src="../js/utils.js"></script>
+<script src="../js/theme.js"></script>
+<script src="../js/settings-service.js"></script>
+
+<style>
+  :root {
+    --bg:#ffffff; --text:#111; --muted:#666; --card:#ffffff; --border:#ddd;
+    --primary:#2196f3; --toast:#323232; --toastText:#fff;
+    --good:#06c167; --neutral:#6b7280; --bad:#ff2d55; --warn:#8b5cf6;
+  }
+  [data-theme="dark"] {
+    --bg:#121212; --text:#eaeaea; --muted:#aaa; --card:#1a1a1a; --border:#2a2a2a;
+    --primary:#2196f3; --toast:#222; --toastText:#eaeaea;
+    --good:#22d47b; --neutral:#94a3b8; --bad:#ff4d6d; --warn:#a78bfa;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 12px;
+    font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial;
+    color: var(--text); background: var(--bg);
+  }
+  .container { width: 100%; max-width: 760px; margin: 0 auto; }
+
+  /* Header */
+  header {
+    padding: 12px 16px; border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  }
+  header h1 { margin: 0; font-size: 18px; font-weight: 800; }
+  .right { margin-left: auto; display: flex; gap: 8px; align-items: center; }
+  a.btn {
+    background: var(--primary); color: #fff;
+    padding: 8px 12px; border-radius: 8px;
+    text-decoration: none; font-size: 14px;
+  }
+  .muted { color: var(--muted); font-size: 12px; }
+  .toggle {
+    border: 1px solid var(--border); background: transparent;
+    color: var(--text); border-radius: 8px; padding: 8px 10px; cursor: pointer;
+  }
+
+  /* Cards */
+  .card {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 12px; padding: 16px; margin: 16px 0;
+  }
+  .card h2 {
+    margin: 0 0 12px; font-size: 16px; font-weight: 700;
+    display: flex; align-items: center; gap: 8px;
+  }
+
+  /* Form elements */
+  input, select, button {
+    padding: 10px 12px; font-size: 14px;
+    border: 1px solid var(--border); border-radius: 8px;
+    background: transparent; color: var(--text);
+  }
+  input:focus, select:focus { outline: 2px solid var(--primary); outline-offset: -2px; }
+  button { cursor: pointer; }
+  button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  .btn-primary { background: var(--primary); color: #fff; border-color: var(--primary); }
+  .btn-danger { background: var(--bad); color: #fff; border-color: var(--bad); }
+  .btn-ghost { background: transparent; color: var(--text); }
+
+  /* Tag Management */
+  .add-tag-form {
+    display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px;
+  }
+  .add-tag-form input { flex: 1; min-width: 150px; }
+  .add-tag-form select { min-width: 140px; }
+  .add-tag-form button { white-space: nowrap; }
+
+  .tag-list { display: flex; flex-direction: column; gap: 8px; }
+
+  .tag-item {
+    display: flex; align-items: center; gap: 8px;
+    padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px;
+    background: var(--bg);
+  }
+  .tag-item .tag-name {
+    flex: 1; font-weight: 500;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .tag-item .tag-badge {
+    font-size: 10px; padding: 2px 6px; border-radius: 4px;
+    background: var(--border); color: var(--muted);
+  }
+  .tag-item select { width: 130px; font-size: 13px; padding: 6px 8px; }
+  .tag-item .btn-icon {
+    width: 32px; height: 32px; padding: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px; border-radius: 6px;
+  }
+
+  .category-good { color: var(--good); }
+  .category-neutral { color: var(--neutral); }
+  .category-bad { color: var(--bad); }
+  .category-non { color: var(--warn); }
+
+  /* Checkbox */
+  .checkbox-row {
+    display: flex; align-items: center; gap: 8px;
+    margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border);
+  }
+  .checkbox-row input[type="checkbox"] {
+    width: 18px; height: 18px; cursor: pointer;
+  }
+  .checkbox-row label { cursor: pointer; font-size: 14px; }
+
+  /* Theme options */
+  .theme-options {
+    display: flex; gap: 12px; flex-wrap: wrap;
+  }
+  .theme-option {
+    flex: 1; min-width: 100px;
+    padding: 16px; border: 2px solid var(--border); border-radius: 10px;
+    text-align: center; cursor: pointer; transition: border-color 0.2s;
+  }
+  .theme-option:hover { border-color: var(--muted); }
+  .theme-option.active { border-color: var(--primary); background: rgba(33, 150, 243, 0.1); }
+  .theme-option .icon { font-size: 24px; margin-bottom: 6px; }
+  .theme-option .label { font-size: 13px; font-weight: 500; }
+
+  /* Language select */
+  .language-select { width: 100%; max-width: 300px; }
+
+  /* Toast */
+  #toast {
+    position: fixed; left: 50%; bottom: 24px;
+    transform: translateX(-50%); background: var(--toast); color: var(--toastText);
+    padding: 10px 14px; border-radius: 10px;
+    opacity: 0; pointer-events: none; transition: opacity 0.2s; z-index: 9999;
+  }
+  #toast.show { opacity: 1; }
+
+  /* Splash */
+  .splash {
+    position: fixed; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    background: var(--bg); color: var(--muted); z-index: 2000;
+  }
+  .preauth .main-content { display: none !important; }
+  #splash { display: none; }
+  .preauth #splash { display: flex; }
+
+  /* Auth required */
+  .auth-required {
+    text-align: center; padding: 40px 20px;
+  }
+  .auth-required h2 { margin-bottom: 12px; }
+  .auth-required a { display: inline-block; margin-top: 16px; }
+
+  /* Empty state */
+  .empty-state {
+    text-align: center; padding: 20px; color: var(--muted);
+    border: 1px dashed var(--border); border-radius: 8px;
+  }
+</style>
+</head>
+<body class="preauth">
+
+<!-- Splash -->
+<div id="splash" class="splash">Caricamento...</div>
+
+<header>
+  <h1>Impostazioni</h1>
+  <div class="right">
+    <button id="themeBtn" class="toggle" title="Tema">🌙</button>
+    <span id="userLabel" class="muted">—</span>
+    <a class="btn" href="../index.html">← Home</a>
+  </div>
+</header>
+
+<div class="container main-content">
+
+  <!-- Auth Required (shown when not logged in) -->
+  <div id="authRequired" class="card auth-required hidden">
+    <h2>🔐 Accesso richiesto</h2>
+    <p class="muted">Devi essere loggato per accedere alle impostazioni.</p>
+    <a class="btn" href="../index.html">← Torna alla home</a>
+  </div>
+
+  <!-- Settings Content -->
+  <div id="settingsContent" class="hidden">
+
+    <!-- Tag Management -->
+    <section class="card">
+      <h2>🏷️ Gestione Tag</h2>
+
+      <div class="add-tag-form">
+        <input type="text" id="newTagName" placeholder="Nome nuovo tag..." maxlength="50">
+        <select id="newTagCategory">
+          <option value="good">Produttivo</option>
+          <option value="neutral" selected>Neutro</option>
+          <option value="bad">Spreco</option>
+          <option value="non">Non gestibile</option>
+        </select>
+        <button id="addTagBtn" class="btn-primary">+ Aggiungi</button>
+      </div>
+
+      <div id="tagList" class="tag-list">
+        <div class="empty-state">Caricamento tag...</div>
+      </div>
+
+      <div class="checkbox-row">
+        <input type="checkbox" id="showDefaults" checked>
+        <label for="showDefaults">Mostra tag predefiniti</label>
+      </div>
+    </section>
+
+    <!-- Theme -->
+    <section class="card">
+      <h2>🎨 Tema</h2>
+      <div class="theme-options">
+        <div class="theme-option" data-theme="light">
+          <div class="icon">☀️</div>
+          <div class="label">Chiaro</div>
+        </div>
+        <div class="theme-option" data-theme="dark">
+          <div class="icon">🌙</div>
+          <div class="label">Scuro</div>
+        </div>
+        <div class="theme-option" data-theme="system">
+          <div class="icon">💻</div>
+          <div class="label">Sistema</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Language -->
+    <section class="card">
+      <h2>🌍 Lingua</h2>
+      <select id="languageSelect" class="language-select">
+        <option value="it">Italiano</option>
+        <option value="en" disabled>English (coming soon)</option>
+        <option value="es" disabled>Español (coming soon)</option>
+      </select>
+    </section>
+
+  </div>
+</div>
+
+<!-- Toast -->
+<div id="toast"></div>
+
+<script>
+/* ===== DOM Elements ===== */
+const authRequired = $('#authRequired');
+const settingsContent = $('#settingsContent');
+const tagList = $('#tagList');
+const newTagName = $('#newTagName');
+const newTagCategory = $('#newTagCategory');
+const addTagBtn = $('#addTagBtn');
+const showDefaultsCheckbox = $('#showDefaults');
+const languageSelect = $('#languageSelect');
+
+let currentUid = null;
+
+/* ===== Category Helpers ===== */
+const categoryNames = {
+  good: 'Produttivo',
+  neutral: 'Neutro',
+  bad: 'Spreco',
+  non: 'Non gestibile'
+};
+
+const categoryClasses = {
+  good: 'category-good',
+  neutral: 'category-neutral',
+  bad: 'category-bad',
+  non: 'category-non'
+};
+
+/* ===== Render Tag List ===== */
+function renderTagList() {
+  const tags = SettingsService.getAllTags();
+  const settings = SettingsService.getCachedSettings();
+
+  if (tags.length === 0) {
+    tagList.innerHTML = '<div class="empty-state">Nessun tag configurato</div>';
+    return;
+  }
+
+  // Separate custom and default tags
+  const customTags = tags.filter(t => !t.isDefault);
+  const defaultTags = tags.filter(t => t.isDefault);
+
+  let html = '';
+
+  // Custom tags first
+  if (customTags.length > 0) {
+    customTags.forEach(tag => {
+      html += renderTagItem(tag);
+    });
+  }
+
+  // Then default tags
+  if (defaultTags.length > 0 && settings?.tags?.showDefaults !== false) {
+    defaultTags.forEach(tag => {
+      html += renderTagItem(tag);
+    });
+  }
+
+  tagList.innerHTML = html || '<div class="empty-state">Nessun tag configurato</div>';
+
+  // Bind event listeners
+  bindTagEvents();
+}
+
+function renderTagItem(tag) {
+  const defaultBadge = tag.isDefault ? '<span class="tag-badge">default</span>' : '';
+
+  return `
+    <div class="tag-item" data-name="${escapeHtml(tag.name)}" data-default="${tag.isDefault}">
+      <span class="tag-name ${categoryClasses[tag.category]}">
+        ${escapeHtml(tag.name)}
+        ${defaultBadge}
+      </span>
+      <select class="category-select" data-tag="${escapeHtml(tag.name)}">
+        <option value="good" ${tag.category === 'good' ? 'selected' : ''}>Produttivo</option>
+        <option value="neutral" ${tag.category === 'neutral' ? 'selected' : ''}>Neutro</option>
+        <option value="bad" ${tag.category === 'bad' ? 'selected' : ''}>Spreco</option>
+        <option value="non" ${tag.category === 'non' ? 'selected' : ''}>Non gestibile</option>
+      </select>
+      ${tag.isDefault
+        ? `<button class="btn-icon btn-ghost reset-btn" data-tag="${escapeHtml(tag.name)}" title="Ripristina default">↺</button>`
+        : `<button class="btn-icon btn-danger delete-btn" data-tag="${escapeHtml(tag.name)}" title="Elimina">🗑️</button>`
+      }
+    </div>
+  `;
+}
+
+function bindTagEvents() {
+  // Category change
+  tagList.querySelectorAll('.category-select').forEach(select => {
+    select.addEventListener('change', async (e) => {
+      const tagName = e.target.dataset.tag;
+      const newCategory = e.target.value;
+      const item = e.target.closest('.tag-item');
+      const isDefault = item.dataset.default === 'true';
+
+      try {
+        await SettingsService.updateTag(currentUid, tagName, newCategory, isDefault);
+        showToast('✅ Categoria aggiornata');
+        renderTagList();
+      } catch (err) {
+        showToast('❌ Errore: ' + err.message);
+      }
+    });
+  });
+
+  // Delete custom tag
+  tagList.querySelectorAll('.delete-btn').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      const tagName = e.target.dataset.tag;
+      if (!confirm(`Eliminare il tag "${tagName}"?`)) return;
+
+      try {
+        await SettingsService.deleteCustomTag(currentUid, tagName);
+        showToast('✅ Tag eliminato');
+        renderTagList();
+      } catch (err) {
+        showToast('❌ Errore: ' + err.message);
+      }
+    });
+  });
+
+  // Reset default tag
+  tagList.querySelectorAll('.reset-btn').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      const tagName = e.target.dataset.tag;
+
+      try {
+        await SettingsService.resetTagMapping(currentUid, tagName);
+        showToast('✅ Tag ripristinato');
+        renderTagList();
+      } catch (err) {
+        showToast('❌ Errore: ' + err.message);
+      }
+    });
+  });
+}
+
+/* ===== Add New Tag ===== */
+addTagBtn.addEventListener('click', async () => {
+  const name = newTagName.value.trim();
+  const category = newTagCategory.value;
+
+  if (!name) {
+    showToast('⚠️ Inserisci un nome per il tag');
+    newTagName.focus();
+    return;
+  }
+
+  try {
+    await SettingsService.addCustomTag(currentUid, name, category);
+    showToast('✅ Tag aggiunto');
+    newTagName.value = '';
+    renderTagList();
+  } catch (err) {
+    showToast('❌ ' + err.message);
+  }
+});
+
+newTagName.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') addTagBtn.click();
+});
+
+/* ===== Show Defaults Toggle ===== */
+showDefaultsCheckbox.addEventListener('change', async (e) => {
+  try {
+    await SettingsService.setShowDefaults(currentUid, e.target.checked);
+    showToast('✅ Impostazione salvata');
+    renderTagList();
+  } catch (err) {
+    showToast('❌ Errore: ' + err.message);
+  }
+});
+
+/* ===== Theme Options ===== */
+document.querySelectorAll('.theme-option').forEach(option => {
+  option.addEventListener('click', async () => {
+    const theme = option.dataset.theme;
+
+    // Update UI
+    document.querySelectorAll('.theme-option').forEach(o => o.classList.remove('active'));
+    option.classList.add('active');
+
+    // Apply theme
+    if (theme === 'system') {
+      const prefDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      document.documentElement.setAttribute('data-theme', prefDark ? 'dark' : 'light');
+      localStorage.removeItem('tt_theme');
+    } else {
+      document.documentElement.setAttribute('data-theme', theme);
+      localStorage.setItem('tt_theme', theme);
+    }
+
+    // Save to Firestore
+    try {
+      await SettingsService.saveTheme(currentUid, theme);
+      showToast('✅ Tema salvato');
+    } catch (err) {
+      showToast('❌ Errore: ' + err.message);
+    }
+  });
+});
+
+/* ===== Language Select ===== */
+languageSelect.addEventListener('change', async (e) => {
+  try {
+    await SettingsService.saveLanguage(currentUid, e.target.value);
+    showToast('✅ Lingua salvata');
+  } catch (err) {
+    showToast('❌ Errore: ' + err.message);
+  }
+});
+
+/* ===== Init Theme Options UI ===== */
+function initThemeUI(theme) {
+  document.querySelectorAll('.theme-option').forEach(o => {
+    o.classList.toggle('active', o.dataset.theme === theme);
+  });
+}
+
+/* ===== Auth State ===== */
+auth.onAuthStateChanged(async (user) => {
+  if (user) {
+    currentUid = user.uid;
+    $('#userLabel').textContent = user.email || user.uid;
+
+    // Load settings
+    showLoading('Caricamento impostazioni...');
+    try {
+      const settings = await SettingsService.loadSettings(user.uid, (updated) => {
+        // Real-time update callback
+        renderTagList();
+        showDefaultsCheckbox.checked = updated.tags?.showDefaults !== false;
+        initThemeUI(updated.theme || 'system');
+        languageSelect.value = updated.language || 'it';
+      });
+
+      // Initial render
+      renderTagList();
+      showDefaultsCheckbox.checked = settings.tags?.showDefaults !== false;
+      initThemeUI(settings.theme || 'system');
+      languageSelect.value = settings.language || 'it';
+
+      authRequired.classList.add('hidden');
+      settingsContent.classList.remove('hidden');
+    } catch (err) {
+      showToast('❌ Errore caricamento: ' + err.message);
+    }
+    hideLoading();
+
+  } else {
+    currentUid = null;
+    settingsContent.classList.add('hidden');
+    authRequired.classList.remove('hidden');
+  }
+
+  document.body.classList.remove('preauth');
+});
+</script>
+</body>
+</html>

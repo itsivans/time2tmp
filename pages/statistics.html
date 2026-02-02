@@ -17,6 +17,7 @@
 <script src="../js/config.js"></script>
 <script src="../js/utils.js"></script>
 <script src="../js/theme.js"></script>
+<script src="../js/settings-service.js"></script>
 
 <style>
   :root{
@@ -343,25 +344,21 @@
 /* ===== Firebase config, theme, and utilities loaded from external files ===== */
 /* See: js/config.js, js/utils.js, js/theme.js */
 
-/* ===== Tag mapping ===== */
-let NON_G = ['Sleep','Work','Survive','Slavery'];
-let GOOD  = ['Study','Productivity','Book','Chinese','Gym','Bike','Chess'];
-let NEUT  = ['Entertainment','Holiday','Nut'];
-let WAST  = ['Waste'];
-const DEFAULT_TAGS = ["Entertainment","Survive","Study","Work","Nut","Slavery","Productivity","Waste","Chess","Gym","Bike","Holiday","Chinese","Sleep","Book"];
-const LS_KEY='tt_custom_tag_map';
-function loadCustomMap(){ try{ return JSON.parse(localStorage.getItem(LS_KEY)||'{}'); }catch{ return {}; } }
-function saveCustomMap(m){ localStorage.setItem(LS_KEY, JSON.stringify(m)); }
-let customMap=loadCustomMap();
-function tagCategory(tag){
-  const t=String(tag||'').trim(); if(!t) return 'neutral';
-  const m=customMap[t]; if(m) return m;
-  if(NON_G.includes(t)) return 'non';
-  if(GOOD.includes(t))  return 'good';
-  if(NEUT.includes(t))  return 'neutral';
-  if(WAST.includes(t))  return 'bad';
-  return 'neutral';
+/* ===== Tag mapping (uses SettingsService) ===== */
+// Tag categories are now loaded from Firestore via SettingsService
+// This function delegates to SettingsService.getTagCategory()
+function tagCategory(tag) {
+  return SettingsService.getTagCategory(tag);
 }
+
+// For backward compatibility with gear panel
+function getCustomMap() {
+  const settings = SettingsService.getCachedSettings();
+  return settings?.tagMappings || {};
+}
+
+// DEFAULT_TAGS constant for tag cloud (reference only)
+const DEFAULT_TAGS = SettingsService.DEFAULT_TAGS.map(t => t.name);
 
 /* ===== Utils ===== */
 // $ is provided by utils.js
@@ -828,6 +825,15 @@ document.addEventListener('DOMContentLoaded', ()=>{
   auth.onAuthStateChanged(async u=>{
     if(!u){ location.href='../index.html'; return; }
     currentUid=u.uid; $('#userLabel').textContent=u.email||u.uid;
+
+    // Load user settings first (for tag categories)
+    await SettingsService.loadSettings(u.uid, () => {
+      // Re-render when settings change (real-time sync)
+      renderAll();
+      renderMapList();
+      buildTagCloud(currentUid);
+    });
+
     await renderAll();
     buildTagCloud(currentUid);
     setActiveSeg('today'); showToday(); // default
@@ -856,8 +862,9 @@ document.addEventListener('DOMContentLoaded', ()=>{
   // gear panel
   const renderMapList = ()=>{
     const box=$('#mapList'); box.innerHTML='';
+    const customMap = getCustomMap();
     const entries=Object.entries(customMap);
-    if(!entries.length){ box.innerHTML=`<span class="pill muted">Nessuna mappatura</span>`; return; }
+    if(!entries.length){ box.innerHTML=`<span class="pill muted">Nessuna mappatura personalizzata</span>`; return; }
     entries.forEach(([tag,cat])=>{
       const color = cat==='good'?'var(--good)':cat==='bad'?'var(--bad)':cat==='non'?'var(--warn)':'var(--neutral)';
       box.innerHTML += `<span class="pill" style="border-color:${color}; color:${color}">${tag} → ${cat}</span>`;
@@ -869,14 +876,41 @@ document.addEventListener('DOMContentLoaded', ()=>{
     p.classList.toggle('show', open); p.setAttribute('aria-hidden', open?'false':'true');
     if(open) buildTagCloud(currentUid);
   });
-  $('#saveMap').addEventListener('click', ()=>{
+  $('#saveMap').addEventListener('click', async ()=>{
     const name=String($('#tagName').value||'').trim(); if(!name) return;
-    const cat=$('#tagCat').value; customMap[name]=cat; saveCustomMap(customMap);
-    $('#tagName').value=''; renderMapList(); renderAll(); buildTagCloud(currentUid);
+    const cat=$('#tagCat').value;
+    try {
+      // Check if it's a default tag or custom
+      const defaultTag = SettingsService.DEFAULT_TAGS.find(t => t.name === name);
+      if (defaultTag) {
+        await SettingsService.updateTag(currentUid, name, cat, true);
+      } else {
+        // Check if custom tag exists
+        const allTags = SettingsService.getAllTags();
+        const exists = allTags.find(t => t.name === name);
+        if (exists && !exists.isDefault) {
+          await SettingsService.updateTag(currentUid, name, cat, false);
+        } else if (!exists) {
+          await SettingsService.addCustomTag(currentUid, name, cat);
+        } else {
+          await SettingsService.updateTag(currentUid, name, cat, true);
+        }
+      }
+      $('#tagName').value=''; renderMapList(); renderAll(); buildTagCloud(currentUid);
+      showToast('✅ Tag aggiornato');
+    } catch(e) {
+      showToast('❌ ' + e.message);
+    }
   });
-  $('#resetMap').addEventListener('click', ()=>{
+  $('#resetMap').addEventListener('click', async ()=>{
     if(!confirm('Cancellare tutte le mappature personalizzate?')) return;
-    customMap={}; saveCustomMap(customMap); renderMapList(); renderAll(); buildTagCloud(currentUid);
+    try {
+      await SettingsService.saveSettings(currentUid, { tagMappings: {}, tags: { custom: [], showDefaults: true } });
+      renderMapList(); renderAll(); buildTagCloud(currentUid);
+      showToast('✅ Mappature resettate');
+    } catch(e) {
+      showToast('❌ ' + e.message);
+    }
   });
 
   // tabella
