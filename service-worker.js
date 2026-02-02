@@ -1,4 +1,4 @@
-const CACHE_NAME = 'time-2026-02-02-v4';
+const CACHE_NAME = 'time-2026-02-02-v10';
 const PRECACHE = [
   'manifest.json',
   'assets/icons/icon-192.png',
@@ -28,13 +28,20 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   const req = event.request;
 
+  // Skip non-GET requests (POST, etc. can't be cached)
+  if (req.method !== 'GET') return;
+
   // Navigazioni (HTML)
   if (req.mode === 'navigate') {
     event.respondWith((async () => {
       try {
         const fresh = await fetch(req);
-        const cache = await caches.open(CACHE_NAME);
-        cache.put(req, fresh.clone());
+        if (fresh.ok) {
+          try {
+            const cache = await caches.open(CACHE_NAME);
+            cache.put(req, fresh.clone());
+          } catch (e) { /* ignore cache errors */ }
+        }
         return fresh;
       } catch (e) {
         const cached = await caches.match(req);
@@ -48,8 +55,13 @@ self.addEventListener('fetch', (event) => {
   event.respondWith((async () => {
     const cached = await caches.match(req);
     const fetchPromise = fetch(req).then(async (res) => {
-      const cache = await caches.open(CACHE_NAME);
-      cache.put(req, res.clone());
+      // Only cache successful GET responses
+      if (res.ok && req.method === 'GET') {
+        try {
+          const cache = await caches.open(CACHE_NAME);
+          cache.put(req, res.clone());
+        } catch (e) { /* ignore cache errors */ }
+      }
       return res;
     }).catch(() => cached);
     return cached || fetchPromise;

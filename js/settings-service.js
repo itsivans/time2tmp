@@ -2,6 +2,8 @@
  * Settings Service
  * Handles user settings CRUD with Firestore sync
  */
+(function() {
+'use strict';
 
 /* ===== Default Tags ===== */
 const DEFAULT_TAGS = [
@@ -57,7 +59,13 @@ async function loadSettings(uid, onUpdate = null) {
 
     // Set up real-time listener if callback provided
     if (onUpdate) {
+      let firstSnapshot = true;
       settingsUnsubscribe = ref.onSnapshot((doc) => {
+        // Skip first snapshot since we already loaded data above
+        if (firstSnapshot) {
+          firstSnapshot = false;
+          return;
+        }
         cachedSettings = doc.exists
           ? { ...DEFAULT_SETTINGS, ...doc.data() }
           : { ...DEFAULT_SETTINGS };
@@ -370,3 +378,4 @@ window.SettingsService = {
   // Cleanup
   cleanupSettings
 };
+})();

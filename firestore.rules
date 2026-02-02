@@ -44,9 +44,7 @@ service cloud.firestore {
       // Settings sub-collection (user preferences, custom tags)
       match /settings/{settingId} {
         allow read: if isOwner(userId);
-        allow create, update: if isOwner(userId)
-          && (request.resource.data.theme == null || request.resource.data.theme in ['light', 'dark', 'system'])
-          && (request.resource.data.language == null || request.resource.data.language is string);
+        allow create, update: if isOwner(userId);
         allow delete: if isOwner(userId);
       }
     }

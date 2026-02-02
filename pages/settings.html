@@ -181,6 +181,9 @@
     text-align: center; padding: 20px; color: var(--muted);
     border: 1px dashed var(--border); border-radius: 8px;
   }
+
+  /* Hidden utility */
+  .hidden { display: none !important; }
 </style>
 </head>
 <body class="preauth">
@@ -191,7 +194,6 @@
 <header>
   <h1>Impostazioni</h1>
   <div class="right">
-    <button id="themeBtn" class="toggle" title="Tema">🌙</button>
     <span id="userLabel" class="muted">—</span>
     <a class="btn" href="../index.html">← Home</a>
   </div>
@@ -496,7 +498,6 @@ auth.onAuthStateChanged(async (user) => {
     $('#userLabel').textContent = user.email || user.uid;
 
     // Load settings
-    showLoading('Caricamento impostazioni...');
     try {
       const settings = await SettingsService.loadSettings(user.uid, (updated) => {
         // Real-time update callback
@@ -517,7 +518,6 @@ auth.onAuthStateChanged(async (user) => {
     } catch (err) {
       showToast('❌ Errore caricamento: ' + err.message);
     }
-    hideLoading();
 
   } else {
     currentUid = null;
