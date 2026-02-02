@@ -13,6 +13,11 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 
+<!-- External JavaScript modules -->
+<script src="../js/config.js"></script>
+<script src="../js/utils.js"></script>
+<script src="../js/theme.js"></script>
+
 <style>
   :root{
     --bg:#ffffff; --text:#0b1320; --muted:#6b7280; --line:#e5e7eb; --card:#f8fafc;
@@ -158,7 +163,7 @@
   <div class="right">
     <button id="themeBtn" class="toggle" title="Tema">🌙</button>
     <span id="userLabel" class="muted">—</span>
-    <a class="btn" href="index.html">↩︎ Inserimento</a>
+    <a class="btn" href="../index.html">↩︎ Inserimento</a>
   </div>
 </header>
 
@@ -335,28 +340,8 @@
 </div>
 
 <script>
-/* ===== Firebase init ===== */
-const firebaseConfig = {
-  apiKey: "AIzaSyDEq8aUhdBPcjYM6H6909DldXAdjhRNWbI",
-  authDomain: "time-ff7ed.firebaseapp.com",
-  projectId: "time-ff7ed",
-  storageBucket: "time-ff7ed.appspot.com",
-  messagingSenderId: "842285944784",
-  appId: "1:842285944784:web:de483548153abc956033d5",
-  measurementId: "G-ZR0BNWGVXJ"
-};
-if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
-const auth = firebase.auth();
-const db = firebase.firestore();
-
-/* ===== Theme ===== */
-const THEME_KEY='tt_theme';
-function applyTheme(t){ document.documentElement.setAttribute('data-theme', t); localStorage.setItem(THEME_KEY, t); document.getElementById('themeBtn').textContent=(t==='dark'?'☀️':'🌙'); }
-(function(){ applyTheme(localStorage.getItem(THEME_KEY)||'light'); })();
-document.getElementById('themeBtn').addEventListener('click', ()=>{
-  const cur = document.documentElement.getAttribute('data-theme');
-  applyTheme(cur==='dark'?'light':'dark');
-});
+/* ===== Firebase config, theme, and utilities loaded from external files ===== */
+/* See: js/config.js, js/utils.js, js/theme.js */
 
 /* ===== Tag mapping ===== */
 let NON_G = ['Sleep','Work','Survive','Slavery'];
@@ -379,12 +364,13 @@ function tagCategory(tag){
 }
 
 /* ===== Utils ===== */
-const $ = s => document.querySelector(s);
+// $ is provided by utils.js
 const dayStart = d => `${d}T00:00`;
 const dayEnd   = d => `${d}T23:59:59`;
 function todayYMD(){ const now=new Date(); const tz=-now.getTimezoneOffset(); return new Date(now.getTime()+tz*60000).toISOString().slice(0,10); }
 function addDaysYMD(ymd, d){ const [y,m,dy]=ymd.split('-').map(Number); const dt=new Date(Date.UTC(y,m-1,dy)); dt.setUTCDate(dt.getUTCDate()+d); return `${dt.getUTCFullYear()}-${String(dt.getUTCMonth()+1).padStart(2,'0')}-${String(dt.getUTCDate()).padStart(2,'0')}`; }
 function fmtHM(m){ const h=Math.floor(m/60),mm=m%60; if(h>0&&mm>0)return `${h}h ${mm}m`; if(h>0)return `${h}h`; return `${mm}m`; }
+
 function col(uid){ return db.collection(`users/${uid}/activities`); }
 
 /* ===== Extra Non Gestibile (local) =====
@@ -840,7 +826,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
   const t=todayYMD(); $('#dayPick').value=t; $('#perEnd').value=t; $('#recStart').value=t; $('#recEnd').value=t;
 
   auth.onAuthStateChanged(async u=>{
-    if(!u){ location.href='index.html'; return; }
+    if(!u){ location.href='../index.html'; return; }
     currentUid=u.uid; $('#userLabel').textContent=u.email||u.uid;
     await renderAll();
     buildTagCloud(currentUid);

@@ -1,9 +1,12 @@
-const CACHE_NAME = 'time-2025-09-11-v2';
+const CACHE_NAME = 'time-2026-01-30-v3';
 const PRECACHE = [
   'manifest.json',
-  'icon-192.png',
-  'icon-512.png'
-  // Non pre-cachiamo HTML/JS per evitare versioni stantie.
+  'assets/icons/icon-192.png',
+  'assets/icons/icon-512.png',
+  'js/config.js',
+  'js/utils.js',
+  'js/theme.js'
+  // Non pre-cachiamo HTML per evitare versioni stantie.
 ];
 
 self.addEventListener('install', (event) => {

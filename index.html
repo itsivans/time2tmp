@@ -5,7 +5,7 @@
   <title>Activity Tracker — Accesso</title>
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <link rel="manifest" href="manifest.json">
-  <link rel="icon" href="icon-192.png">
+  <link rel="icon" href="assets/icons/icon-192.png">
   <meta name="theme-color" content="#2196f3">
 
   <!-- Pre-init TEMA: evita flash errato -->
@@ -23,6 +23,11 @@
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+
+  <!-- External JavaScript modules -->
+  <script src="js/config.js"></script>
+  <script src="js/utils.js"></script>
+  <script src="js/theme.js"></script></script>
 
   <style>
     /* ===== Theme Vars ===== */
@@ -82,7 +87,7 @@
       background:var(--primary); color:#fff; border:none; border-radius:10px;
       margin-top:16px; font-weight:bold; width:100%; min-height:48px;
     }
-    a[href="statistics.html"]{ display:block; }
+    a[href="pages/statistics.html"]{ display:block; }
 
     /* Tools in alto a destra: tema + chip utente */
     .top-tools{
@@ -227,7 +232,7 @@
         <div id="msg" class="muted" style="margin-top:6px"></div>
       </div>
 
-      <a href="statistics.html"><button class="link">📊 Vai alle statistiche</button></a>
+      <a href="pages/statistics.html"><button class="link">📊 Vai alle statistiche</button></a>
     </div>
   </div>
 
@@ -235,79 +240,40 @@
   <div id="toast"></div>
 
   <script>
-    /* ===== Firebase ===== */
-    const firebaseConfig = {
-      apiKey: "AIzaSyDEq8aUhdBPcjYM6H6909DldXAdjhRNWbI",
-      authDomain: "time-ff7ed.firebaseapp.com",
-      projectId: "time-ff7ed",
-      storageBucket: "time-ff7ed.appspot.com",
-      messagingSenderId: "842285944784",
-      appId: "1:842285944784:web:de483548153abc956033d5",
-      measurementId: "G-ZR0BNWGVXJ"
-    };
-    if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+    /* ===== Page-Specific Code (uses external utils.js, config.js, theme.js) ===== */
 
-    firebase.firestore().enablePersistence({synchronizeTabs:true}).catch(e=>{
-      console.warn('Persistence non attiva:', e.code);
-    });
-
-    const auth = firebase.auth();
-    const db   = firebase.firestore();
-
-    /* ===== Tema ===== */
-    const THEME_KEY='tt_theme';
-    const themeBtn = document.getElementById('themeBtn');
-    function applyTheme(t){
-      document.documentElement.setAttribute('data-theme', t);
-      localStorage.setItem(THEME_KEY, t);
-      themeBtn.textContent = (t==='dark' ? '☀️' : '🌙');
-      // aggiorna meta theme-color (utile in PWA)
-      const meta = document.querySelector('meta[name="theme-color"]');
-      if (meta) meta.setAttribute('content', t==='dark' ? '#0b1118' : '#2196f3');
-    }
-    (function initTheme(){
-      const cur = document.documentElement.getAttribute('data-theme') || 'light';
-      applyTheme(cur);
-    })();
-    themeBtn.addEventListener('click', ()=>{
-      const cur = document.documentElement.getAttribute('data-theme') || 'light';
-      applyTheme(cur==='dark' ? 'light' : 'dark');
-    });
-
-    /* ===== Helpers UI ===== */
-    const $ = s => document.querySelector(s);
+    // DOM elements
     const authBox    = $('#authBox');
     const appBox     = $('#appBox');
     const statuschip = $('#statuschip');
     const whoEl      = $('#who');
     const msg        = $('#msg');
-    const toastEl    = $('#toast');
     const nickPop    = $('#nickPop');
     const nickInput  = $('#nickInput');
     const lastEl     = $('#lastRecord');
 
-    const NICK_KEY = 'timeNickname';
     const LAST_KEY = 'tt_last_rec';
 
+    // Rate limiter for add button (prevent spam)
+    const addRateLimiter = createRateLimiter(1000);
+
+    // Initialize network detection
+    initNetworkDetection();
+
+    // Initialize keyboard shortcuts
+    initKeyboardShortcuts({
+      'ctrl+k': () => $('#activity').focus(),
+      'ctrl+enter': () => $('#addBtn').click()
+    });
+
+    /* ===== Helpers ===== */
     function setMsg(t){ msg.textContent = t || ''; }
-    function showToast(text){
-      toastEl.textContent = text;
-      toastEl.classList.add('show');
-      setTimeout(()=>toastEl.classList.remove('show'), 1600);
-    }
-    function getLocalISODateTimeNow(){
-      const now = new Date(); now.setSeconds(0,0);
-      const tz = -now.getTimezoneOffset();
-      return new Date(now.getTime()+tz*60000).toISOString().slice(0,16);
-    }
-    function loadNick(){ try { return localStorage.getItem(NICK_KEY) || ''; } catch { return ''; } }
-    function saveNick(v){ try { localStorage.setItem(NICK_KEY, v||''); } catch {} }
-    function clearNick(){ try { localStorage.removeItem(NICK_KEY); } catch {} }
-    function nameFromEmail(email){ return (email || '').split('@')[0]; }
+
     function updateWho(user){
       const nick = loadNick().trim();
       whoEl.textContent = nick || nameFromEmail(user.email) || 'utente';
     }
+
     function toggleNickPop(show){
       if (show) {
         const user = auth.currentUser;
@@ -319,30 +285,31 @@
       }
     }
 
-    /* ===== Ultimo record (helpers) ===== */
-    function fmt(ts){
-      try{
-        const d = new Date(ts);
-        if(!isNaN(d)) return d.toLocaleString('it-IT', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' });
-      }catch{}
-      return ts;
-    }
+    /* ===== Last Record Display (with sanitization) ===== */
     function setLast(rec){
       if(!rec){ lastEl.textContent=''; return; }
       const {activity, tag, timestamp} = rec;
-      lastEl.innerHTML = `Ultimo inserito: <b>«${(activity||'').replaceAll('<','&lt;')}»</b> — ${tag||'-'} • ${fmt(timestamp||'')}`;
+      lastEl.innerHTML = `Ultimo inserito: <b>«${escapeHtml(activity||'')}»</b> — ${escapeHtml(tag||'-')} • ${formatTimestamp(timestamp||'')}`;
     }
-    function saveLast(rec){ try{ localStorage.setItem(LAST_KEY, JSON.stringify(rec)); }catch{} }
-    function loadLast(){ try{ const v = localStorage.getItem(LAST_KEY); return v? JSON.parse(v): null; }catch{ return null } }
+
+    function saveLast(rec){ setLocalJSON(LAST_KEY, rec); }
+    function loadLast(){ return getLocalJSON(LAST_KEY, null); }
 
     async function fetchLastFromDb(uid){
-      try{
-        const snap = await db.collection(`users/${uid}/activities`).orderBy('timestamp','desc').limit(1).get();
-        if(!snap.empty){ const data = snap.docs[0].data(); setLast(data); saveLast(data); }
-      }catch(e){ console.warn('Errore lettura ultimo record:', e.message); }
+      const result = await safeFirebaseCall(
+        async () => {
+          const snap = await db.collection(`users/${uid}/activities`).orderBy('timestamp','desc').limit(1).get();
+          if(!snap.empty){
+            const data = snap.docs[0].data();
+            setLast(data);
+            saveLast(data);
+          }
+        },
+        'Errore lettura ultimo record'
+      );
     }
 
-    /* ===== Auth state (anti-flash) ===== */
+    /* ===== Auth State ===== */
     let firstAuthEventHandled = false;
     auth.onAuthStateChanged(async user => {
       if (user) {
@@ -358,7 +325,7 @@
         act.onkeydown = (e) => { if (e.key === 'Enter') $('#addBtn').click(); };
         act.onfocus   = () => { if (!dt.value) dt.value = getLocalISODateTimeNow(); };
 
-        // mostra ultimo record (prima locale, poi da DB)
+        // Show last record (local first, then from DB)
         setLast(loadLast());
         await fetchLastFromDb(user.uid);
 
@@ -376,35 +343,45 @@
       }
     });
 
-    /* ===== Auth actions ===== */
+    /* ===== Auth Actions ===== */
     $('#loginBtn').onclick = async () => {
       const email = $('#email').value.trim();
       const pass  = $('#pass').value;
       if (!email || !pass) return setMsg('Inserisci email e password.');
-      try { await auth.signInWithEmailAndPassword(email, pass); setMsg('Accesso eseguito.'); }
-      catch(e){ console.error(e); setMsg(mapAuthError(e.code, e.message)); }
+
+      showLoading('Accesso in corso...');
+      const result = await safeFirebaseCall(
+        async () => await auth.signInWithEmailAndPassword(email, pass),
+        'Errore di accesso'
+      );
+      hideLoading();
+
+      if (result) setMsg('Accesso eseguito.');
     };
+
     $('#signupBtn').onclick = async () => {
       const email = $('#email').value.trim();
       const pass  = $('#pass').value;
       if (!email || !pass) return setMsg('Inserisci email e password.');
-      try { await auth.createUserWithEmailAndPassword(email, pass); await auth.currentUser.sendEmailVerification(); setMsg('Registrazione ok. Verifica la tua email.'); }
-      catch(e){ console.error(e); setMsg(mapAuthError(e.code, e.message)); }
+
+      showLoading('Registrazione in corso...');
+      const result = await safeFirebaseCall(
+        async () => {
+          await auth.createUserWithEmailAndPassword(email, pass);
+          await auth.currentUser.sendEmailVerification();
+          return true;
+        },
+        'Errore di registrazione'
+      );
+      hideLoading();
+
+      if (result) setMsg('Registrazione ok. Verifica la tua email.');
     };
+
     $('#logoutBtn').onclick = () => {
       if (!confirm('Sei sicuro di voler uscire?')) return;
       auth.signOut();
     };
-    function mapAuthError(code, fallback){
-      const map = {
-        'auth/invalid-email': 'Email non valida.',
-        'auth/user-not-found': 'Utente non trovato.',
-        'auth/wrong-password': 'Password errata.',
-        'auth/email-already-in-use': 'Email già in uso.',
-        'auth/too-many-requests': 'Troppe richieste, riprova più tardi.'
-      };
-      return map[code] || fallback || 'Errore.';
-    }
 
     /* ===== Nickname (solo locale) ===== */
     whoEl.onclick = () => toggleNickPop(true);
@@ -428,29 +405,40 @@
       if (!withinPop && !clickedWho) toggleNickPop(false);
     });
 
-    /* ===== Add activity ===== */
+    /* ===== Add Activity (with rate limiting & validation) ===== */
     $('#addBtn').onclick = async () => {
       const user = auth.currentUser;
       if (!user) return setMsg('Devi essere loggato.');
+
+      // Rate limiting
+      if (!addRateLimiter.canProceed()) {
+        showToast('⏱️ Attendi un momento prima di aggiungere un\'altra attività');
+        return;
+      }
 
       const activity = $('#activity').value.trim();
       const tag      = $('#tag').value;
       let   dateTime = $('#dateTime').value;
 
       if (!activity || !tag) return setMsg('Inserisci attività e tag!');
+      if (activity.length > 500) return setMsg('Attività troppo lunga (max 500 caratteri)');
       if (!dateTime) dateTime = getLocalISODateTimeNow();
 
       const record = { activity, tag, timestamp: dateTime };
 
-      try {
-        await db.collection(`users/${user.uid}/activities`).add(record);
+      showLoading('Salvataggio in corso...');
+      const result = await safeFirebaseCall(
+        async () => await db.collection(`users/${user.uid}/activities`).add(record),
+        'Errore nel salvataggio'
+      );
+      hideLoading();
+
+      if (result) {
         $('#activity').value = ''; $('#dateTime').value = ''; $('#tag').value = '';
-        setMsg('Attività salvata.'); showToast('✅ Attività inserita');
-        // aggiorna microcopy
-        setLast(record); saveLast(record);
-      } catch (e) {
-        console.error(e);
-        setMsg('Errore nel salvataggio: ' + e.message);
+        setMsg('Attività salvata.');
+        showToast('✅ Attività inserita');
+        setLast(record);
+        saveLast(record);
       }
     };
 
