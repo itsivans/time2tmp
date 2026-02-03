@@ -6,7 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <link rel="manifest" href="manifest.json">
   <link rel="icon" href="assets/icons/icon-192.png">
-  <meta name="theme-color" content="#2196f3">
+  <meta name="theme-color" content="#c9a227">
 
   <!-- Pre-init TEMA: evita flash errato -->
   <script>
@@ -31,15 +31,17 @@
   <script src="js/settings-service.js"></script>
 
   <style>
-    /* ===== Theme Vars ===== */
+    /* ===== Theme Vars (Warm Gold Brand) ===== */
     :root[data-theme="light"]{
-      --bg:#ffffff; --text:#111; --muted:#666; --card:#ffffff; --border:#ddd;
-      --primary:#2196f3; --toast:#323232; --toastText:#fff;
+      --brand:#c9a227; --brand-light:#f8f4e8; --brand-dark:#a8871f; --accent:#d4b43a;
+      --bg:#fafaf8; --text:#2c2c2c; --muted:#777; --card:#ffffff; --border:#e8e4d8;
+      --primary:#c9a227; --toast:#2c2c2c; --toastText:#fff;
       --chip-bg:rgba(0,0,0,.06); --chip-text:#333;
     }
     :root[data-theme="dark"]{
-      --bg:#121212; --text:#eaeaea; --muted:#aaa; --card:#1a1a1a; --border:#2a2a2a;
-      --primary:#2196f3; --toast:#222; --toastText:#eaeaea;
+      --brand:#c9a227; --brand-light:#2a2518; --brand-dark:#a8871f; --accent:#d4b43a;
+      --bg:#18171a; --text:#e8e6e3; --muted:#999; --card:#222024; --border:#3a3838;
+      --primary:#c9a227; --toast:#222; --toastText:#eaeaea;
       --chip-bg:rgba(255,255,255,.10); --chip-text:#ddd;
     }
 
@@ -149,6 +151,50 @@
     /* Ultimo record */
     .lastrecord{ text-align:center; font-size:12px; opacity:.85; margin-top:6px; }
     .lastrecord b{ font-weight:600; }
+
+    /* ===== Card Top Accent Bar ===== */
+    .card{
+      position:relative; overflow:hidden;
+    }
+    .card::before{
+      content:''; position:absolute; top:0; left:0; right:0; height:3px;
+      background:var(--brand);
+    }
+
+    /* ===== Time Remaining Bar ===== */
+    .time-remaining{
+      background:var(--brand-light);
+      border-radius:12px;
+      padding:16px;
+      margin:12px 0 16px;
+      text-align:center;
+    }
+    .time-remaining .label{
+      font-size:12px; color:var(--muted);
+      margin-bottom:6px;
+      text-transform:uppercase; letter-spacing:0.5px;
+    }
+    .time-remaining .time{
+      font-size:28px; font-weight:700;
+      color:var(--brand);
+      margin-bottom:10px;
+    }
+    .progress-bar{
+      height:8px;
+      background:var(--border);
+      border-radius:99px;
+      overflow:hidden;
+    }
+    .progress-bar .fill{
+      height:100%;
+      background:var(--brand);
+      border-radius:99px;
+      transition:width 0.5s ease;
+    }
+    .time-remaining .percent{
+      font-size:12px; color:var(--muted);
+      margin-top:8px;
+    }
   </style>
 </head>
 <body class="preauth">
@@ -212,6 +258,16 @@
           </select>
         </div>
 
+        <!-- Time Remaining Bar -->
+        <div class="time-remaining">
+          <div class="label">Tempo rimanente</div>
+          <div class="time" id="timeLeft">--h --m</div>
+          <div class="progress-bar">
+            <div class="fill" id="progressFill" style="width: 0%"></div>
+          </div>
+          <div class="percent" id="percentText">--% completato</div>
+        </div>
+
         <div class="addWrap"><button id="addBtn">➕ Aggiungi</button></div>
 
         <!-- Ultimo record (microcopy) -->
@@ -247,6 +303,33 @@
 
     // Initialize network detection
     initNetworkDetection();
+
+    // Time remaining bar update
+    function updateTimeRemaining() {
+      const now = new Date();
+      const endOfDay = new Date(now);
+      endOfDay.setHours(23, 59, 59, 999);
+
+      const remaining = endOfDay - now;
+      const hours = Math.floor(remaining / (1000 * 60 * 60));
+      const minutes = Math.floor((remaining % (1000 * 60 * 60)) / (1000 * 60));
+
+      const startOfDay = new Date(now);
+      startOfDay.setHours(0, 0, 0, 0);
+      const totalDay = 24 * 60 * 60 * 1000;
+      const elapsed = now - startOfDay;
+      const percent = Math.round((elapsed / totalDay) * 100);
+
+      const timeLeftEl = document.getElementById('timeLeft');
+      const progressEl = document.getElementById('progressFill');
+      const percentEl = document.getElementById('percentText');
+
+      if (timeLeftEl) timeLeftEl.textContent = `${hours}h ${minutes}m`;
+      if (progressEl) progressEl.style.width = percent + '%';
+      if (percentEl) percentEl.textContent = `${percent}% completato`;
+    }
+    updateTimeRemaining();
+    setInterval(updateTimeRemaining, 60000);
 
     // Initialize keyboard shortcuts
     initKeyboardShortcuts({

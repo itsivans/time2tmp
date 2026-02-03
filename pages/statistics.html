@@ -824,6 +824,9 @@ function dayProgress(ymd){
 document.addEventListener('DOMContentLoaded', ()=>{
   const t=todayYMD(); $('#dayPick').value=t; $('#perEnd').value=t; $('#recStart').value=t; $('#recEnd').value=t;
 
+  // Initialize network detection (online/offline indicator)
+  initNetworkDetection();
+
   auth.onAuthStateChanged(async u=>{
     if(!u){ location.href='../index.html'; return; }
     currentUid=u.uid; $('#userLabel').textContent=u.email||u.uid;

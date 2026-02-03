@@ -284,6 +284,9 @@ const languageSelect = $('#languageSelect');
 
 let currentUid = null;
 
+// Initialize network detection (online/offline indicator)
+initNetworkDetection();
+
 /* ===== Category Helpers ===== */
 const categoryNames = {
   good: 'Produttivo',

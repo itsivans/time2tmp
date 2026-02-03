@@ -1,4 +1,4 @@
-const CACHE_NAME = 'time-2026-02-02-v10';
+const CACHE_NAME = 'time-2026-02-03-v12';
 const PRECACHE = [
   'manifest.json',
   'assets/icons/icon-192.png',
