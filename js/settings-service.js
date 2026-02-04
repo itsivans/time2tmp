@@ -5,6 +5,15 @@
 (function() {
 'use strict';
 
+/* ===== Default Templates ===== */
+const DEFAULT_TEMPLATES = [
+  { id: 't1', emoji: '🌅', name: 'Wake', tag: 'Sleep' },
+  { id: 't2', emoji: '🚪', name: 'Left Home', tag: 'Survive' },
+  { id: 't3', emoji: '🏢', name: 'At Work', tag: 'Survive' },
+  { id: 't4', emoji: '🚶', name: 'Left Work', tag: 'Work' },
+  { id: 't5', emoji: '🏠', name: 'Home', tag: 'Survive' }
+];
+
 /* ===== Default Tags ===== */
 const DEFAULT_TAGS = [
   { name: "Entertainment", category: "neutral" },
@@ -27,6 +36,7 @@ const DEFAULT_TAGS = [
 const DEFAULT_SETTINGS = {
   tags: { custom: [], showDefaults: true },
   tagMappings: {},
+  templates: null, // null = use defaults, array = custom templates
   theme: 'system',
   language: 'it',
   version: 1
@@ -246,6 +256,95 @@ async function setShowDefaults(uid, show) {
   });
 }
 
+/* ===== Template Functions ===== */
+
+/**
+ * Get all templates (defaults or custom)
+ * @param {Object} settings - Settings object (uses cache if not provided)
+ * @returns {Array} Array of template objects
+ */
+function getTemplates(settings = cachedSettings) {
+  // If user has custom templates, return those; otherwise return defaults
+  if (settings?.templates && Array.isArray(settings.templates)) {
+    return settings.templates;
+  }
+  return [...DEFAULT_TEMPLATES];
+}
+
+/**
+ * Add a new template
+ * @param {string} uid - User ID
+ * @param {Object} template - Template object { emoji, name, tag }
+ * @returns {Promise<Object>} Updated settings
+ */
+async function addTemplate(uid, template) {
+  const { emoji, name, tag } = template;
+  if (!name?.trim()) throw new Error('Nome template richiesto');
+  if (!tag?.trim()) throw new Error('Tag richiesto');
+
+  const current = getTemplates();
+  const newTemplate = {
+    id: 't' + Date.now(),
+    emoji: emoji || '📌',
+    name: name.trim(),
+    tag: tag.trim()
+  };
+
+  const updated = [...current, newTemplate];
+  return saveSettings(uid, { templates: updated });
+}
+
+/**
+ * Update an existing template
+ * @param {string} uid - User ID
+ * @param {string} templateId - Template ID
+ * @param {Object} updates - { emoji?, name?, tag? }
+ * @returns {Promise<Object>} Updated settings
+ */
+async function updateTemplate(uid, templateId, updates) {
+  const current = getTemplates();
+  const updated = current.map(t =>
+    t.id === templateId ? { ...t, ...updates } : t
+  );
+  return saveSettings(uid, { templates: updated });
+}
+
+/**
+ * Delete a template
+ * @param {string} uid - User ID
+ * @param {string} templateId - Template ID
+ * @returns {Promise<Object>} Updated settings
+ */
+async function deleteTemplate(uid, templateId) {
+  const current = getTemplates();
+  const updated = current.filter(t => t.id !== templateId);
+  return saveSettings(uid, { templates: updated });
+}
+
+/**
+ * Reorder templates
+ * @param {string} uid - User ID
+ * @param {Array} templateIds - Array of template IDs in new order
+ * @returns {Promise<Object>} Updated settings
+ */
+async function reorderTemplates(uid, templateIds) {
+  const current = getTemplates();
+  const templateMap = new Map(current.map(t => [t.id, t]));
+  const reordered = templateIds
+    .map(id => templateMap.get(id))
+    .filter(Boolean);
+  return saveSettings(uid, { templates: reordered });
+}
+
+/**
+ * Reset templates to defaults
+ * @param {string} uid - User ID
+ * @returns {Promise<Object>} Updated settings
+ */
+async function resetTemplates(uid) {
+  return saveSettings(uid, { templates: null });
+}
+
 /* ===== Theme Functions ===== */
 
 /**
@@ -347,6 +446,7 @@ function cleanupSettings() {
 window.SettingsService = {
   // Constants
   DEFAULT_TAGS,
+  DEFAULT_TEMPLATES,
   DEFAULT_SETTINGS,
 
   // Core functions
@@ -363,6 +463,14 @@ window.SettingsService = {
   deleteCustomTag,
   resetTagMapping,
   setShowDefaults,
+
+  // Template functions
+  getTemplates,
+  addTemplate,
+  updateTemplate,
+  deleteTemplate,
+  reorderTemplates,
+  resetTemplates,
 
   // Theme functions
   saveTheme,
