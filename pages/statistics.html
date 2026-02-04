@@ -19,35 +19,47 @@
 <script src="../js/theme.js"></script>
 <script src="../js/settings-service.js"></script>
 
+<!-- Shared Styles -->
+<link rel="stylesheet" href="../css/shared.css">
+
 <style>
-  :root{
-    --bg:#ffffff; --text:#0b1320; --muted:#6b7280; --line:#e5e7eb; --card:#f8fafc;
+  /* ===== Theme Overrides for Statistics (Warm Gold) ===== */
+  :root, :root[data-theme="light"]{
+    --bg:#fafaf8; --text:#2c2c2c; --muted:#777; --line:#e8e4d8; --card:#ffffff;
     --good:#06c167; --neutral:#6b7280; --bad:#ff2d55;
-    --good-bg:#e9fff4; --neutral-bg:#f3f4f6; --bad-bg:#ffe9ee;
-    --link:#1e88e5;
-    --chip:#eef2f7; --chipText:#334155;
+    --good-bg:#e9fff4; --neutral-bg:#f8f4e8; --bad-bg:#ffe9ee;
+    --link:#c9a227;
+    --chip:#f8f4e8; --chipText:#2c2c2c;
     --warn:#8b5cf6;
+    --brand:#c9a227; --brand-light:#f8f4e8; --brand-dark:#a8871f;
   }
   [data-theme="dark"]{
-    --bg:#0b1118; --text:#e6edf3; --muted:#94a3b8; --line:#1f2937; --card:#0f1620;
-    --good:#22d47b; --neutral:#a6adbb; --bad:#ff4d6d;
-    --good-bg:#0d2a1e; --neutral-bg:#141a23; --bad-bg:#2a0f15;
-    --link:#62a8ff;
-    --chip:#151c27; --chipText:#cdd6e1;
+    --bg:#18171a; --text:#e8e6e3; --muted:#999; --line:#3a3838; --card:#222024;
+    --good:#22d47b; --neutral:#94a3b8; --bad:#ff4d6d;
+    --good-bg:#0d2a1e; --neutral-bg:#2a2518; --bad-bg:#2a0f15;
+    --link:#d4b43a;
+    --chip:#2a2518; --chipText:#e8e6e3;
     --warn:#a78bfa;
+    --brand:#c9a227; --brand-light:#2a2518; --brand-dark:#a8871f;
   }
 
-  *{box-sizing:border-box}
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent}
   body{margin:0; font-family:system-ui, -apple-system, Segoe UI, Roboto, Arial; color:var(--text); background:var(--bg)}
-  header{padding:12px 16px; border-bottom:1px solid var(--line); display:flex; align-items:center; gap:10px; flex-wrap:wrap}
+  header{padding:12px 16px; border-bottom:1px solid var(--line); display:flex; align-items:center; gap:10px; flex-wrap:wrap; background:var(--card); position:sticky; top:0; z-index:100}
+  header::after{content:''; position:absolute; bottom:0; left:0; right:0; height:3px; background:var(--brand)}
   header h1{margin:0; font-size:18px; font-weight:800}
   .right{margin-left:auto; display:flex; gap:8px; align-items:center}
-  a.btn{background:var(--link); color:#fff; padding:8px 10px; border-radius:8px; text-decoration:none; font-size:14px}
+  a.btn{background:var(--brand); color:#fff; padding:8px 10px; border-radius:8px; text-decoration:none; font-size:14px; transition:background 0.2s, transform 0.15s}
+  a.btn:hover{background:var(--brand-dark); transform:translateY(-1px)}
+  a.btn:active{transform:scale(0.97)}
   .muted{color:var(--muted); font-size:12px}
   .toggle{border:1px solid var(--line); background:transparent; color:var(--text); border-radius:8px; padding:8px 10px; cursor:pointer}
 
   .wrap{padding:14px 16px; display:grid; gap:14px; max-width:980px; margin:0 auto}
-  .card{background:var(--card); border:1px solid var(--line); border-radius:12px; padding:12px}
+  .card{background:var(--card); border:1px solid var(--line); border-radius:12px; padding:12px; position:relative; overflow:hidden; transition:transform 0.2s, box-shadow 0.2s}
+  .card::before{content:''; position:absolute; top:0; left:0; right:0; height:3px; background:var(--brand)}
+  .card:hover{transform:translateY(-2px); box-shadow:0 8px 24px rgba(0,0,0,0.08)}
+  [data-theme="dark"] .card:hover{box-shadow:0 8px 24px rgba(0,0,0,0.3)}
   .title{margin:0 0 4px; font-size:16px; font-weight:800; text-align:center}
 
   .toolbar{display:flex; gap:8px; align-items:center; flex-wrap:wrap}
@@ -101,8 +113,10 @@
   .recCtrl{ display:flex; gap:6px; align-items:center; flex-wrap:wrap; margin-top:8px }
   .recCtrl input, .recCtrl button{ padding:6px 8px; border:1px solid var(--line); border-radius:8px; font-size:14px; background:transparent; color:var(--text) }
   .recCtrl .grow{ margin-left:auto; min-width:180px }
-  .btn{ border:1px solid var(--line); background:transparent; color:var(--text); border-radius:8px; padding:6px 10px; cursor:pointer }
-  .btn.primary{ background:var(--link); color:#fff; border-color:var(--link) }
+  .btn{ border:1px solid var(--line); background:transparent; color:var(--text); border-radius:8px; padding:6px 10px; cursor:pointer; transition:transform 0.15s, box-shadow 0.15s; position:relative; overflow:hidden }
+  .btn:active{transform:scale(0.97)}
+  .btn.primary{ background:var(--brand); color:#fff; border-color:var(--brand) }
+  .btn.primary:hover{background:var(--brand-dark); box-shadow:0 4px 12px rgba(201,162,39,0.25)}
 
   /* Icon buttons compatti e allineati */
   .iconBtn{
@@ -143,9 +157,9 @@
   /* ===== Barra avanzamento giornata ===== */
   .dayProg { max-width:420px; margin:0 auto 8px; }
   .dayProg .head { display:flex; justify-content:space-between; font-size:12px; color:var(--muted); margin-bottom:4px; }
-  .dayProg .bar { height:10px; background:#eef2f7; border-radius:999px; overflow:hidden; }
-  [data-theme="dark"] .dayProg .bar{ background:#1f2732; }
-  .dayProg .fill { height:100%; width:0%; background:linear-gradient(90deg, var(--link), var(--good)); transition:width .3s; }
+  .dayProg .bar { height:10px; background:var(--line); border-radius:999px; overflow:hidden; }
+  [data-theme="dark"] .dayProg .bar{ background:#2a2518; }
+  .dayProg .fill { height:100%; width:0%; background:linear-gradient(90deg, var(--brand), var(--good)); transition:width .3s; }
 
   /* ===== Non gestibile extra (UI) ===== */
   .ngx { max-width:420px; margin:10px auto 0; }
@@ -952,6 +966,20 @@ async function renderAll(){
   dayProgress(ymd);
   $('#loading').textContent='Pronto';
 }
+</script>
+
+<!-- UI Enhancements -->
+<script src="../js/ui-enhancements.js"></script>
+<script>
+  // Initialize UI enhancements with pull-to-refresh
+  initUIEnhancements({
+    onRefresh: async () => {
+      if (currentUid) {
+        await renderAll();
+        showToast('✅ Aggiornato');
+      }
+    }
+  });
 </script>
 </body>
 </html>

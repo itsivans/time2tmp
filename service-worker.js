@@ -1,4 +1,4 @@
-const CACHE_NAME = 'time-2026-02-03-v12';
+const CACHE_NAME = 'time-2026-02-04-v13';
 const PRECACHE = [
   'manifest.json',
   'assets/icons/icon-192.png',
@@ -6,7 +6,9 @@ const PRECACHE = [
   'js/config.js',
   'js/utils.js',
   'js/theme.js',
-  'js/settings-service.js'
+  'js/settings-service.js',
+  'js/ui-enhancements.js',
+  'css/shared.css'
   // Non pre-cachiamo HTML per evitare versioni stantie.
 ];
 

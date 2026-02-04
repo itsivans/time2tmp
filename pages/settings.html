@@ -26,19 +26,25 @@
 <script src="../js/theme.js"></script>
 <script src="../js/settings-service.js"></script>
 
+<!-- Shared Styles -->
+<link rel="stylesheet" href="../css/shared.css">
+
 <style>
-  :root {
-    --bg:#ffffff; --text:#111; --muted:#666; --card:#ffffff; --border:#ddd;
-    --primary:#2196f3; --toast:#323232; --toastText:#fff;
+  /* ===== Theme Overrides for Settings (Warm Gold) ===== */
+  :root, :root[data-theme="light"] {
+    --bg:#fafaf8; --text:#2c2c2c; --muted:#777; --card:#ffffff; --border:#e8e4d8;
+    --primary:#c9a227; --toast:#2c2c2c; --toastText:#fff;
     --good:#06c167; --neutral:#6b7280; --bad:#ff2d55; --warn:#8b5cf6;
+    --brand:#c9a227; --brand-light:#f8f4e8; --brand-dark:#a8871f;
   }
   [data-theme="dark"] {
-    --bg:#121212; --text:#eaeaea; --muted:#aaa; --card:#1a1a1a; --border:#2a2a2a;
-    --primary:#2196f3; --toast:#222; --toastText:#eaeaea;
+    --bg:#18171a; --text:#e8e6e3; --muted:#999; --card:#222024; --border:#3a3838;
+    --primary:#c9a227; --toast:#222; --toastText:#eaeaea;
     --good:#22d47b; --neutral:#94a3b8; --bad:#ff4d6d; --warn:#a78bfa;
+    --brand:#c9a227; --brand-light:#2a2518; --brand-dark:#a8871f;
   }
 
-  * { box-sizing: border-box; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   body {
     margin: 0; padding: 12px;
     font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial;
@@ -50,14 +56,19 @@
   header {
     padding: 12px 16px; border-bottom: 1px solid var(--border);
     display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    background: var(--card); position: sticky; top: 0; z-index: 100;
   }
+  header::after { content: ''; position: absolute; bottom: 0; left: 0; right: 0; height: 3px; background: var(--brand); }
   header h1 { margin: 0; font-size: 18px; font-weight: 800; }
   .right { margin-left: auto; display: flex; gap: 8px; align-items: center; }
   a.btn {
-    background: var(--primary); color: #fff;
+    background: var(--brand); color: #fff;
     padding: 8px 12px; border-radius: 8px;
     text-decoration: none; font-size: 14px;
+    transition: background 0.2s, transform 0.15s;
   }
+  a.btn:hover { background: var(--brand-dark); transform: translateY(-1px); }
+  a.btn:active { transform: scale(0.97); }
   .muted { color: var(--muted); font-size: 12px; }
   .toggle {
     border: 1px solid var(--border); background: transparent;
@@ -68,7 +79,12 @@
   .card {
     background: var(--card); border: 1px solid var(--border);
     border-radius: 12px; padding: 16px; margin: 16px 0;
+    position: relative; overflow: hidden;
+    transition: transform 0.2s, box-shadow 0.2s;
   }
+  .card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px; background: var(--brand); }
+  .card:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,0.08); }
+  [data-theme="dark"] .card:hover { box-shadow: 0 8px 24px rgba(0,0,0,0.3); }
   .card h2 {
     margin: 0 0 12px; font-size: 16px; font-weight: 700;
     display: flex; align-items: center; gap: 8px;
@@ -84,9 +100,13 @@
   button { cursor: pointer; }
   button:disabled { opacity: 0.5; cursor: not-allowed; }
 
-  .btn-primary { background: var(--primary); color: #fff; border-color: var(--primary); }
-  .btn-danger { background: var(--bad); color: #fff; border-color: var(--bad); }
-  .btn-ghost { background: transparent; color: var(--text); }
+  .btn-primary { background: var(--brand); color: #fff; border-color: var(--brand); transition: background 0.2s, transform 0.15s; }
+  .btn-primary:hover { background: var(--brand-dark); box-shadow: 0 4px 12px rgba(201,162,39,0.25); }
+  .btn-primary:active { transform: scale(0.97); }
+  .btn-danger { background: var(--bad); color: #fff; border-color: var(--bad); transition: transform 0.15s; }
+  .btn-danger:active { transform: scale(0.97); }
+  .btn-ghost { background: transparent; color: var(--text); transition: transform 0.15s; }
+  .btn-ghost:active { transform: scale(0.97); }
 
   /* Tag Management */
   .add-tag-form {
@@ -143,7 +163,7 @@
     text-align: center; cursor: pointer; transition: border-color 0.2s;
   }
   .theme-option:hover { border-color: var(--muted); }
-  .theme-option.active { border-color: var(--primary); background: rgba(33, 150, 243, 0.1); }
+  .theme-option.active { border-color: var(--brand); background: var(--brand-light); }
   .theme-option .icon { font-size: 24px; margin-bottom: 6px; }
   .theme-option .label { font-size: 13px; font-weight: 500; }
 
@@ -530,6 +550,21 @@ auth.onAuthStateChanged(async (user) => {
 
   document.body.classList.remove('preauth');
 });
+</script>
+
+<!-- UI Enhancements -->
+<script src="../js/ui-enhancements.js"></script>
+<script>
+  // Initialize UI enhancements
+  initUIEnhancements({
+    onRefresh: async () => {
+      if (currentUid) {
+        await SettingsService.loadSettings(currentUid);
+        renderTagList();
+        showToast('✅ Aggiornato');
+      }
+    }
+  });
 </script>
 </body>
 </html>
