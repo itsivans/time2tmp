@@ -7,30 +7,18 @@
 
 /* ===== Default Templates ===== */
 const DEFAULT_TEMPLATES = [
-  { id: 't1', emoji: '🌅', name: 'Wake', tag: 'Sleep' },
-  { id: 't2', emoji: '🚪', name: 'Left Home', tag: 'Survive' },
-  { id: 't3', emoji: '🏢', name: 'At Work', tag: 'Survive' },
-  { id: 't4', emoji: '🚶', name: 'Left Work', tag: 'Work' },
-  { id: 't5', emoji: '🏠', name: 'Home', tag: 'Survive' }
+  { id: 't1', emoji: '🌅', name: 'Wake', tag: 'Sleep' }
 ];
 
 /* ===== Default Tags ===== */
 const DEFAULT_TAGS = [
-  { name: "Entertainment", category: "neutral" },
-  { name: "Survive", category: "non" },
-  { name: "Study", category: "good" },
-  { name: "Work", category: "non" },
-  { name: "Nut", category: "neutral" },
-  { name: "Slavery", category: "non" },
-  { name: "Productivity", category: "good" },
-  { name: "Waste", category: "bad" },
-  { name: "Chess", category: "good" },
-  { name: "Gym", category: "good" },
-  { name: "Bike", category: "good" },
-  { name: "Holiday", category: "neutral" },
-  { name: "Chinese", category: "good" },
   { name: "Sleep", category: "non" },
-  { name: "Book", category: "good" }
+  { name: "Food", category: "non" },
+  { name: "Survive", category: "non" },
+  { name: "Work", category: "non" },
+  { name: "Study", category: "good" },
+  { name: "Exercise", category: "good" },
+  { name: "Entertainment", category: "neutral" }
 ];
 
 const DEFAULT_SETTINGS = {
