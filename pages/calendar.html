@@ -1,0 +1,969 @@
+<!DOCTYPE html>
+<html lang="it" data-theme="light">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Calendario</title>
+
+<!-- Pre-init theme -->
+<script>
+  (function(){
+    const saved = localStorage.getItem('tt_theme');
+    const prefDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+    const theme = saved || (prefDark ? 'dark' : 'light');
+    document.documentElement.setAttribute('data-theme', theme);
+  })();
+</script>
+
+<!-- Firebase (compat) -->
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+
+<!-- External JavaScript modules -->
+<script src="../js/config.js"></script>
+<script src="../js/utils.js"></script>
+<script src="../js/theme.js"></script>
+<script src="../js/settings-service.js"></script>
+
+<!-- Shared Styles -->
+<link rel="stylesheet" href="../css/shared.css">
+
+<style>
+  /* ===== Theme Overrides for Calendar (Warm Gold) ===== */
+  :root, :root[data-theme="light"]{
+    --bg:#fafaf8; --text:#2c2c2c; --muted:#777; --line:#e8e4d8; --card:#ffffff;
+    --good:#06c167; --neutral:#6b7280; --bad:#ff2d55;
+    --good-bg:#e9fff4; --neutral-bg:#f8f4e8; --bad-bg:#ffe9ee;
+    --link:#c9a227;
+    --chip:#f8f4e8; --chipText:#2c2c2c;
+    --warn:#8b5cf6;
+    --brand:#c9a227; --brand-light:#f8f4e8; --brand-dark:#a8871f;
+    --note-dot:#06c167;
+  }
+  [data-theme="dark"]{
+    --bg:#18171a; --text:#e8e6e3; --muted:#999; --line:#3a3838; --card:#222024;
+    --good:#22d47b; --neutral:#94a3b8; --bad:#ff4d6d;
+    --good-bg:#0d2a1e; --neutral-bg:#2a2518; --bad-bg:#2a0f15;
+    --link:#d4b43a;
+    --chip:#2a2518; --chipText:#e8e6e3;
+    --warn:#a78bfa;
+    --brand:#c9a227; --brand-light:#2a2518; --brand-dark:#a8871f;
+    --note-dot:#22d47b;
+  }
+
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent}
+  body{margin:0; font-family:system-ui, -apple-system, Segoe UI, Roboto, Arial; color:var(--text); background:var(--bg)}
+  header{padding:12px 16px; border-bottom:1px solid var(--line); display:flex; align-items:center; gap:10px; flex-wrap:wrap; background:var(--card); position:sticky; top:0; z-index:100}
+  header::after{content:''; position:absolute; bottom:0; left:0; right:0; height:3px; background:var(--brand)}
+  header h1{margin:0; font-size:18px; font-weight:800}
+  .right{margin-left:auto; display:flex; gap:8px; align-items:center}
+  a.btn{background:var(--brand); color:#fff; padding:8px 10px; border-radius:8px; text-decoration:none; font-size:14px; transition:background 0.2s, transform 0.15s}
+  a.btn:hover{background:var(--brand-dark); transform:translateY(-1px)}
+  a.btn:active{transform:scale(0.97)}
+  .muted{color:var(--muted); font-size:12px}
+  .toggle{border:1px solid var(--line); background:transparent; color:var(--text); border-radius:8px; padding:8px 10px; cursor:pointer; text-decoration:none}
+
+  .wrap{padding:14px 16px; display:grid; gap:14px; max-width:760px; margin:0 auto}
+  .card{background:var(--card); border:1px solid var(--line); border-radius:12px; padding:12px; position:relative; overflow:hidden; transition:transform 0.2s, box-shadow 0.2s}
+  .card::before{content:''; position:absolute; top:0; left:0; right:0; height:3px; background:var(--brand)}
+  .card:hover{transform:translateY(-2px); box-shadow:0 8px 24px rgba(0,0,0,0.08)}
+  [data-theme="dark"] .card:hover{box-shadow:0 8px 24px rgba(0,0,0,0.3)}
+
+  /* ===== Calendar Navigation ===== */
+  .cal-nav{
+    display:flex; align-items:center; justify-content:space-between; padding:16px;
+  }
+  .cal-nav button{
+    width:40px; height:40px; border-radius:8px; border:1px solid var(--line);
+    background:transparent; color:var(--text); cursor:pointer; font-size:20px;
+    transition:background 0.2s, transform 0.15s;
+  }
+  .cal-nav button:hover{background:var(--brand-light)}
+  .cal-nav button:active{transform:scale(0.95)}
+  .cal-nav h2{margin:0; font-size:18px; font-weight:700}
+  .cal-nav .today-btn{
+    font-size:12px; width:auto; padding:6px 12px; height:auto;
+    color:var(--brand); border-color:var(--brand);
+  }
+  .cal-nav .today-btn:hover{background:var(--brand); color:#fff}
+
+  /* ===== Calendar Grid ===== */
+  .cal-grid{padding:12px}
+  .weekdays{
+    display:grid; grid-template-columns:repeat(7,1fr); gap:4px;
+    margin-bottom:8px; text-align:center;
+    font-size:12px; color:var(--muted); font-weight:600; text-transform:uppercase; letter-spacing:0.3px;
+  }
+  .days{
+    display:grid; grid-template-columns:repeat(7,1fr); gap:4px;
+  }
+  .day-cell{
+    aspect-ratio:1; border:1px solid transparent; border-radius:8px;
+    padding:4px; cursor:pointer; position:relative; background:transparent;
+    transition:all 0.15s; display:flex; flex-direction:column; align-items:center; justify-content:center;
+    min-height:42px;
+  }
+  .day-cell:hover{border-color:var(--brand); background:var(--brand-light)}
+  .day-cell.selected{border-color:var(--brand); background:var(--brand-light); border-width:2px}
+  .day-cell.today .day-num{
+    background:var(--brand); color:#fff; border-radius:50%;
+    width:28px; height:28px; display:flex; align-items:center; justify-content:center;
+  }
+  .day-cell.other{opacity:0.3; pointer-events:none}
+  .day-num{font-size:13px; font-weight:500; line-height:1}
+  .day-dots{display:flex; gap:3px; margin-top:3px; min-height:6px}
+  .dot{width:5px; height:5px; border-radius:50%}
+  .dot.act{background:var(--brand)}
+  .dot.note{background:var(--note-dot)}
+
+  /* ===== Day Health Tints ===== */
+  .day-cell.health-good{background:rgba(6,193,103,0.18); border-color:rgba(6,193,103,0.3)}
+  .day-cell.health-bad{background:rgba(255,45,85,0.15); border-color:rgba(255,45,85,0.3)}
+  .day-cell.health-neutral{background:rgba(107,114,128,0.1); border-color:rgba(107,114,128,0.2)}
+  [data-theme="dark"] .day-cell.health-good{background:rgba(34,212,123,0.18); border-color:rgba(34,212,123,0.3)}
+  [data-theme="dark"] .day-cell.health-bad{background:rgba(255,77,109,0.18); border-color:rgba(255,77,109,0.3)}
+  [data-theme="dark"] .day-cell.health-neutral{background:rgba(148,163,184,0.12); border-color:rgba(148,163,184,0.2)}
+  .day-cell.health-good:hover, .day-cell.health-good.selected{background:rgba(6,193,103,0.28); border-color:var(--good)}
+  .day-cell.health-bad:hover, .day-cell.health-bad.selected{background:rgba(255,45,85,0.25); border-color:var(--bad)}
+  .day-cell.health-neutral:hover, .day-cell.health-neutral.selected{background:rgba(107,114,128,0.15); border-color:var(--neutral)}
+
+  /* Day health summary bar in detail panel */
+  .health-bar{display:flex; height:10px; border-radius:99px; overflow:hidden; margin:8px 0 16px}
+  .health-bar .seg{height:100%; transition:width 0.3s}
+  .health-bar .seg.good{background:var(--good)}
+  .health-bar .seg.neutral{background:var(--neutral)}
+  .health-bar .seg.bad{background:var(--bad)}
+  .health-bar .seg.non{background:var(--warn)}
+  .health-summary{display:flex; gap:12px; flex-wrap:wrap; justify-content:center; margin-bottom:16px; font-size:12px; color:var(--muted)}
+  .health-summary .hs-item{display:flex; align-items:center; gap:4px}
+  .health-summary .hs-dot{width:8px; height:8px; border-radius:50%}
+  .health-coverage{text-align:center; font-size:11px; color:var(--muted); margin-bottom:8px}
+
+  /* ===== Smart Recap ===== */
+  .recap-section{
+    border-top:1px solid var(--line); padding:16px 0; margin-bottom:0;
+  }
+  .recap-box{
+    background:var(--bg); border:1px solid var(--line); border-radius:10px;
+    padding:14px 16px; position:relative;
+  }
+  .recap-box::before{
+    content:''; position:absolute; top:0; left:0; right:0; height:3px;
+    border-radius:10px 10px 0 0;
+  }
+  .recap-box.good::before{background:var(--good)}
+  .recap-box.bad::before{background:var(--bad)}
+  .recap-box.neutral::before{background:var(--neutral)}
+  .recap-box.non::before{background:var(--warn)}
+  .recap-header{display:flex; align-items:center; gap:8px; margin-bottom:8px}
+  .recap-emoji{font-size:20px}
+  .recap-title{font-size:13px; font-weight:700}
+  .recap-text{font-size:13px; line-height:1.5; color:var(--text)}
+  .recap-text .highlight{font-weight:600}
+  .recap-meta{margin-top:10px; font-size:11px; color:var(--muted); display:flex; gap:12px; flex-wrap:wrap}
+
+  /* ===== Day Detail Panel ===== */
+  .day-detail{margin-top:0; animation:fadeUp 0.2s ease}
+  @keyframes fadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+  .detail-date{margin:0 0 16px; font-size:16px; font-weight:700; text-align:center}
+  .section-label{
+    font-size:12px; font-weight:600; color:var(--muted);
+    text-transform:uppercase; letter-spacing:0.5px; margin:0 0 8px;
+  }
+
+  /* Activities list */
+  .act-list{display:flex; flex-direction:column; gap:6px; margin-bottom:20px}
+  .act-item{
+    display:flex; align-items:center; gap:10px; padding:8px 10px;
+    border:1px solid var(--line); border-radius:8px; background:var(--bg);
+  }
+  .act-time{font-size:12px; color:var(--muted); min-width:44px; font-variant-numeric:tabular-nums}
+  .act-name{flex:1; font-size:14px}
+  .act-tag{
+    font-size:11px; padding:3px 8px; border-radius:6px;
+    background:var(--chip); color:var(--chipText);
+    border-left:3px solid var(--brand); white-space:nowrap;
+  }
+  .act-empty{text-align:center; padding:16px; color:var(--muted); font-size:14px}
+  .act-count{font-size:12px; color:var(--muted); text-align:center; margin-top:4px}
+
+  /* Note section */
+  .note-section{border-top:1px solid var(--line); padding-top:16px}
+  .note-header{display:flex; justify-content:space-between; align-items:center; margin-bottom:8px}
+  .save-status{font-size:12px; color:var(--muted); transition:color 0.2s}
+  .save-status.saving{color:var(--brand)}
+  .save-status.saved{color:var(--good)}
+  .save-status.error{color:var(--bad)}
+  #dayNote{
+    width:100%; min-height:120px; padding:12px; border:1px solid var(--line);
+    border-radius:8px; background:var(--bg); color:var(--text);
+    font-family:inherit; font-size:14px; resize:vertical; transition:border-color 0.2s;
+  }
+  #dayNote:focus{outline:none; border-color:var(--brand); box-shadow:0 0 0 3px rgba(201,162,39,0.15)}
+  .note-footer{display:flex; justify-content:flex-end; margin-top:4px; font-size:12px; color:var(--muted)}
+
+  /* Legend */
+  .legend{display:flex; gap:16px; justify-content:center; margin-top:8px; font-size:11px; color:var(--muted)}
+  .legend-item{display:flex; align-items:center; gap:4px}
+  .legend-dot{width:8px; height:8px; border-radius:50%}
+
+  .hidden{display:none !important}
+
+  @media (max-width:420px){
+    .day-cell{min-height:36px}
+    .day-num{font-size:12px}
+    .cal-nav h2{font-size:16px}
+    .act-item{gap:6px; padding:6px 8px}
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>📅 Calendario</h1>
+  <div class="right">
+    <span id="userLabel" class="muted">—</span>
+    <a href="settings.html" class="toggle" title="Impostazioni">⚙️</a>
+    <a class="btn" href="../index.html">↩︎ Inserimento</a>
+  </div>
+</header>
+
+<div class="wrap">
+  <!-- Month Navigation -->
+  <div class="card cal-nav">
+    <button id="prevMonth" title="Mese precedente">‹</button>
+    <button class="today-btn" id="todayBtn" title="Torna a oggi">Oggi</button>
+    <h2 id="monthLabel">—</h2>
+    <button id="nextMonth" title="Mese successivo">›</button>
+  </div>
+
+  <!-- Calendar Grid -->
+  <div class="card cal-grid">
+    <div class="weekdays">
+      <span>Dom</span><span>Lun</span><span>Mar</span><span>Mer</span><span>Gio</span><span>Ven</span><span>Sab</span>
+    </div>
+    <div class="days" id="calDays"></div>
+    <div class="legend">
+      <span class="legend-item"><span class="legend-dot" style="background:var(--brand)"></span> Attività</span>
+      <span class="legend-item"><span class="legend-dot" style="background:var(--note-dot)"></span> Nota</span>
+    </div>
+  </div>
+
+  <!-- Day Detail Panel (hidden until a day is clicked) -->
+  <div id="dayDetail" class="card day-detail hidden">
+    <h3 id="detailDate" class="detail-date">—</h3>
+
+    <h4 class="section-label">Attività</h4>
+    <div id="actList" class="act-list"></div>
+
+    <!-- Smart Recap -->
+    <div id="dayRecap" class="recap-section hidden"></div>
+
+    <div class="note-section">
+      <div class="note-header">
+        <h4 class="section-label" style="margin:0">Nota giornaliera</h4>
+        <span id="saveStatus" class="save-status"></span>
+      </div>
+      <textarea id="dayNote" placeholder="Scrivi una nota per questo giorno..." maxlength="5000"></textarea>
+      <div class="note-footer"><span id="charCount">0 / 5000</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div id="toast"></div>
+
+<script>
+/* ===== Calendar Page Logic ===== */
+
+const MONTHS_IT = ['Gennaio','Febbraio','Marzo','Aprile','Maggio','Giugno',
+                   'Luglio','Agosto','Settembre','Ottobre','Novembre','Dicembre'];
+const NOTE_DEBOUNCE = 1000;
+const MAX_NOTE = 5000;
+
+let currentUid = null;
+let viewMonth = new Date();       // month being displayed
+let selectedDate = null;          // YYYY-MM-DD or null
+const actCache = new Map();       // "YYYY-MM" -> [{id, activity, tag, timestamp}, ...]
+const noteCache = new Map();      // "YYYY-MM-DD" -> "content"
+const noteDaysCache = new Map();  // "YYYY-MM" -> Set<"YYYY-MM-DD"> (days with notes)
+let noteTimer = null;
+
+/* ===== Firestore helpers ===== */
+function actCol(uid){ return db.collection(`users/${uid}/activities`); }
+function noteCol(uid){ return db.collection(`users/${uid}/notes`); }
+
+/* ===== Fetch activities for a month (cached) ===== */
+async function loadMonthActivities(monthKey){
+  if(actCache.has(monthKey)) return actCache.get(monthKey);
+
+  const [y, m] = monthKey.split('-').map(Number);
+  const lastDay = new Date(y, m, 0).getDate();
+  const start = `${monthKey}-01T00:00:00`;
+  const end   = `${monthKey}-${String(lastDay).padStart(2,'0')}T23:59:59`;
+
+  const result = await safeFirebaseCall(async ()=>{
+    const snap = await actCol(currentUid)
+      .where('timestamp','>=', start)
+      .where('timestamp','<=', end)
+      .orderBy('timestamp','asc')
+      .get();
+    const arr = [];
+    snap.forEach(d=>{ const data=d.data(); arr.push({id:d.id, activity:data.activity, tag:data.tag, timestamp:data.timestamp}); });
+    return arr;
+  }, 'Errore caricamento attività');
+
+  const activities = result || [];
+  actCache.set(monthKey, activities);
+  return activities;
+}
+
+/* ===== Fetch which days in a month have notes ===== */
+async function loadMonthNoteDays(monthKey){
+  if(noteDaysCache.has(monthKey)) return noteDaysCache.get(monthKey);
+
+  const [y, m] = monthKey.split('-').map(Number);
+  const lastDay = new Date(y, m, 0).getDate();
+  const startId = `${monthKey}-01`;
+  const endId   = `${monthKey}-${String(lastDay).padStart(2,'0')}`;
+
+  try {
+    const snap = await noteCol(currentUid)
+      .where(firebase.firestore.FieldPath.documentId(), '>=', startId)
+      .where(firebase.firestore.FieldPath.documentId(), '<=', endId + '\uf8ff')
+      .get();
+    const days = new Set();
+    snap.forEach(d=>{ if(d.data().content) days.add(d.id); });
+    noteDaysCache.set(monthKey, days);
+    return days;
+  } catch(e) {
+    // Graceful fallback if notes collection doesn't exist or rules not deployed yet
+    console.warn('Notes query failed (rules may not be deployed yet):', e.code);
+    const empty = new Set();
+    noteDaysCache.set(monthKey, empty);
+    return empty;
+  }
+}
+
+/* ===== Day Health Calculation ===== */
+/**
+ * Calculates the health of a day based on time spent in each tag category.
+ * Time blocks are measured from one activity to the next.
+ * Only the span between the first and last activity counts.
+ * Returns { good, bad, neutral, non, total, health } in minutes.
+ * health = 'good' | 'bad' | 'neutral' | null (not enough data)
+ */
+function calcDayHealth(dateStr){
+  const monthKey = dateStr.slice(0,7);
+  const all = actCache.get(monthKey) || [];
+  const dayActs = all
+    .filter(a=> a.timestamp.startsWith(dateStr))
+    .sort((a,b)=> a.timestamp.localeCompare(b.timestamp));
+
+  if(dayActs.length < 2) return null; // Need at least 2 activities to measure time
+
+  let good=0, bad=0, neutral=0, non=0;
+
+  for(let i=0; i < dayActs.length - 1; i++){
+    const t1 = new Date(dayActs[i].timestamp).getTime();
+    const t2 = new Date(dayActs[i+1].timestamp).getTime();
+    const mins = (t2 - t1) / 60000;
+    if(mins <= 0) continue;
+
+    const cat = SettingsService.getTagCategory(dayActs[i].tag);
+    if(cat === 'good') good += mins;
+    else if(cat === 'bad') bad += mins;
+    else if(cat === 'non') non += mins;
+    else neutral += mins;
+  }
+
+  const total = good + bad + neutral + non;
+  if(total <= 0) return null;
+
+  let health = 'neutral';
+  if(good > bad) health = 'good';
+  else if(bad > good) health = 'bad';
+
+  return { good, bad, neutral, non, total, health };
+}
+
+/* ===== Render Calendar Grid ===== */
+async function renderCalendar(){
+  const y = viewMonth.getFullYear();
+  const m = viewMonth.getMonth(); // 0-based
+  const monthKey = `${y}-${String(m+1).padStart(2,'0')}`;
+
+  $('#monthLabel').textContent = `${MONTHS_IT[m]} ${y}`;
+
+  showLoading('Caricamento...');
+  const [activities, noteDays] = await Promise.all([
+    loadMonthActivities(monthKey),
+    loadMonthNoteDays(monthKey)
+  ]);
+  hideLoading();
+
+  // Build a Set of dates with activities
+  const actDays = new Set();
+  activities.forEach(a=>{ actDays.add(a.timestamp.slice(0,10)); });
+
+  const firstDay = new Date(y, m, 1).getDay(); // 0=Sun
+  const daysInMonth = new Date(y, m+1, 0).getDate();
+  const today = todayYMD();
+
+  const grid = $('#calDays');
+  grid.innerHTML = '';
+
+  // Previous month trailing days
+  const prevLast = new Date(y, m, 0).getDate();
+  for(let i = firstDay - 1; i >= 0; i--){
+    grid.appendChild(makeCell(prevLast - i, true));
+  }
+
+  // Current month
+  for(let d = 1; d <= daysInMonth; d++){
+    const dateStr = `${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const hasAct  = actDays.has(dateStr);
+    const hasNote = noteDays.has(dateStr);
+    const isToday = dateStr === today;
+    const isSel   = dateStr === selectedDate;
+    const health  = hasAct ? calcDayHealth(dateStr) : null;
+    grid.appendChild(makeCell(d, false, dateStr, hasAct, hasNote, isToday, isSel, health));
+  }
+
+  // Next month leading days
+  const totalCells = firstDay + daysInMonth;
+  const rows = Math.ceil(totalCells / 7);
+  const fill = rows * 7 - totalCells;
+  for(let d = 1; d <= fill; d++){
+    grid.appendChild(makeCell(d, true));
+  }
+}
+
+function makeCell(num, isOther, dateStr, hasAct, hasNote, isToday, isSel, health){
+  const cell = document.createElement('div');
+  cell.className = 'day-cell';
+  if(isOther) cell.classList.add('other');
+  if(isToday) cell.classList.add('today');
+  if(isSel) cell.classList.add('selected');
+  if(health) cell.classList.add('health-' + health.health);
+
+  const n = document.createElement('div');
+  n.className = 'day-num';
+  n.textContent = num;
+  cell.appendChild(n);
+
+  const dots = document.createElement('div');
+  dots.className = 'day-dots';
+  if(hasAct){ const d=document.createElement('div'); d.className='dot act'; dots.appendChild(d); }
+  if(hasNote){ const d=document.createElement('div'); d.className='dot note'; dots.appendChild(d); }
+  cell.appendChild(dots);
+
+  if(!isOther && dateStr){
+    cell.addEventListener('click', ()=> selectDay(dateStr));
+  }
+  return cell;
+}
+
+/* ===== Day Selection ===== */
+async function selectDay(dateStr){
+  selectedDate = dateStr;
+
+  // Update grid selection
+  $$('.day-cell').forEach(c=> c.classList.remove('selected'));
+  // Find and select the clicked cell
+  $$('.day-cell:not(.other)').forEach(c=>{
+    const num = parseInt(c.querySelector('.day-num').textContent);
+    const [,, day] = dateStr.split('-').map(Number);
+    if(num === day) c.classList.add('selected');
+  });
+
+  // Show detail panel
+  const panel = $('#dayDetail');
+  panel.classList.remove('hidden');
+
+  // Format date header
+  const dt = new Date(dateStr + 'T12:00:00');
+  const formatted = dt.toLocaleDateString('it-IT', {weekday:'long', day:'numeric', month:'long', year:'numeric'});
+  $('#detailDate').textContent = formatted.charAt(0).toUpperCase() + formatted.slice(1);
+
+  // Render activities + health summary + recap
+  renderDayActivities(dateStr);
+  renderDayHealth(dateStr);
+  generateDayRecap(dateStr);
+
+  // Load note
+  await loadDayNote(dateStr);
+
+  // Scroll to detail
+  panel.scrollIntoView({behavior:'smooth', block:'nearest'});
+}
+
+/* ===== Render Activities for Selected Day ===== */
+function renderDayActivities(dateStr){
+  const monthKey = dateStr.slice(0,7);
+  const all = actCache.get(monthKey) || [];
+  const dayActs = all.filter(a=> a.timestamp.startsWith(dateStr));
+
+  const list = $('#actList');
+
+  if(dayActs.length === 0){
+    list.innerHTML = '<div class="act-empty">Nessuna attività registrata</div>';
+    return;
+  }
+
+  list.innerHTML = '';
+  dayActs.forEach(act=>{
+    const item = document.createElement('div');
+    item.className = 'act-item';
+
+    const time = document.createElement('span');
+    time.className = 'act-time';
+    time.textContent = act.timestamp.slice(11,16);
+
+    const name = document.createElement('span');
+    name.className = 'act-name';
+    name.textContent = act.activity;
+
+    const tag = document.createElement('span');
+    tag.className = 'act-tag';
+    tag.textContent = act.tag;
+
+    // Color by category
+    const cat = SettingsService.getTagCategory(act.tag);
+    const colors = {good:'var(--good)', bad:'var(--bad)', neutral:'var(--neutral)', non:'var(--warn)'};
+    tag.style.borderLeftColor = colors[cat] || 'var(--brand)';
+
+    item.appendChild(time);
+    item.appendChild(name);
+    item.appendChild(tag);
+    list.appendChild(item);
+  });
+
+  // Activity count
+  const countEl = document.createElement('div');
+  countEl.className = 'act-count';
+  countEl.textContent = `${dayActs.length} attività`;
+  list.appendChild(countEl);
+}
+
+/* ===== Render Day Health Summary ===== */
+function renderDayHealth(dateStr){
+  // Remove previous health elements
+  document.querySelectorAll('.health-bar, .health-summary, .health-coverage').forEach(el=> el.remove());
+
+  const health = calcDayHealth(dateStr);
+  if(!health) return;
+
+  const container = $('#actList');
+
+  // Coverage info
+  const totalH = Math.floor(health.total / 60);
+  const totalM = Math.round(health.total % 60);
+  const covEl = document.createElement('div');
+  covEl.className = 'health-coverage';
+  covEl.textContent = `Copertura: ${totalH}h ${totalM}m tracciati`;
+  container.after(covEl);
+
+  // Stacked bar
+  const bar = document.createElement('div');
+  bar.className = 'health-bar';
+  const segments = [
+    {cat:'good', mins:health.good},
+    {cat:'neutral', mins:health.neutral},
+    {cat:'bad', mins:health.bad},
+    {cat:'non', mins:health.non}
+  ];
+  segments.forEach(s=>{
+    if(s.mins <= 0) return;
+    const seg = document.createElement('div');
+    seg.className = 'seg ' + s.cat;
+    seg.style.width = ((s.mins / health.total) * 100) + '%';
+    bar.appendChild(seg);
+  });
+  covEl.after(bar);
+
+  // Legend with values
+  const summary = document.createElement('div');
+  summary.className = 'health-summary';
+  const labels = {good:'Produttivo', neutral:'Neutro', bad:'Spreco', non:'Non gestibile'};
+  const dotColors = {good:'var(--good)', neutral:'var(--neutral)', bad:'var(--bad)', non:'var(--warn)'};
+  segments.forEach(s=>{
+    if(s.mins <= 0) return;
+    const h = Math.floor(s.mins / 60);
+    const m = Math.round(s.mins % 60);
+    const item = document.createElement('span');
+    item.className = 'hs-item';
+    item.innerHTML = `<span class="hs-dot" style="background:${dotColors[s.cat]}"></span> ${labels[s.cat]}: ${h}h${m > 0 ? ' '+m+'m' : ''}`;
+    summary.appendChild(item);
+  });
+  bar.after(summary);
+}
+
+/* ===== Smart Daily Recap ===== */
+function fmtMins(m){ const h=Math.floor(m/60), mm=Math.round(m%60); return h>0 ? (mm>0?`${h}h ${mm}m`:`${h}h`) : `${mm}m`; }
+
+/**
+ * Shorthand dictionary: expands abbreviated activity names to human-readable text.
+ * Also recognizes common patterns to understand what the user actually did.
+ */
+const SHORTHAND = {
+  // Movement / location
+  'o h': 'uscito di casa', 'oh': 'uscito di casa', 'out home': 'uscito di casa',
+  'i h': 'rientrato a casa', 'ih': 'rientrato a casa', 'in home': 'rientrato a casa',
+  'i w': 'arrivato al lavoro', 'iw': 'arrivato al lavoro', 'in work': 'arrivato al lavoro',
+  'o w': 'uscito dal lavoro', 'ow': 'uscito dal lavoro', 'out work': 'uscito dal lavoro',
+  // Daily routine
+  'wake': 'sveglia', 'wakeup': 'sveglia', 'wake up': 'sveglia',
+  'sleep': 'andato a dormire', 'bed': 'andato a dormire', 'nanna': 'andato a dormire',
+  'dinner': 'cena', 'lunch': 'pranzo', 'breakfast': 'colazione',
+  'bar': 'passato dal bar', 'coffee': 'caffè',
+  'shower': 'doccia', 'gym': 'palestra', 'bike': 'bicicletta',
+  // Generic
+  'chill': 'relax', 'nut': 'nutrizione',
+};
+
+/**
+ * Expands a shorthand activity name. If not in dictionary, returns original.
+ * Also tries to understand context from the tag.
+ */
+function expandActivity(name, tag){
+  const key = name.toLowerCase().trim();
+  if(SHORTHAND[key]) return SHORTHAND[key];
+  // Return original (capitalized) if no shorthand match
+  return name;
+}
+
+/**
+ * Determines if an activity is a "transition" (movement, wake, etc.) vs a "doing" activity.
+ * Transitions are short markers, not things you spend time on.
+ */
+function isTransition(name){
+  const key = name.toLowerCase().trim();
+  const transitions = ['o h','oh','i h','ih','i w','iw','o w','ow','wake','wakeup','wake up',
+    'sleep','bed','out home','in home','in work','out work','bar'];
+  return transitions.includes(key);
+}
+
+/**
+ * Builds a chronological narrative of the day.
+ */
+function generateDayRecap(dateStr){
+  const recapEl = $('#dayRecap');
+  recapEl.innerHTML = '';
+  recapEl.classList.add('hidden');
+
+  const monthKey = dateStr.slice(0,7);
+  const all = actCache.get(monthKey) || [];
+  const dayActs = all
+    .filter(a=> a.timestamp.startsWith(dateStr))
+    .sort((a,b)=> a.timestamp.localeCompare(b.timestamp));
+
+  if(dayActs.length < 2) return;
+
+  const health = calcDayHealth(dateStr);
+  if(!health) return;
+
+  // === Build time blocks with enriched data ===
+  const blocks = []; // {name, expanded, tag, cat, startTime, endTime, mins}
+  for(let i=0; i < dayActs.length - 1; i++){
+    const t1 = new Date(dayActs[i].timestamp).getTime();
+    const t2 = new Date(dayActs[i+1].timestamp).getTime();
+    const mins = (t2 - t1) / 60000;
+    if(mins <= 0) continue;
+    const cat = SettingsService.getTagCategory(dayActs[i].tag);
+    blocks.push({
+      name: dayActs[i].activity,
+      expanded: expandActivity(dayActs[i].activity, dayActs[i].tag),
+      tag: dayActs[i].tag,
+      cat,
+      startTime: dayActs[i].timestamp.slice(11,16),
+      endTime: dayActs[i+1].timestamp.slice(11,16),
+      mins
+    });
+  }
+
+  // === Merge consecutive same-activity blocks ===
+  const merged = [];
+  blocks.forEach(b=>{
+    const last = merged[merged.length-1];
+    if(last && last.name.toLowerCase().trim() === b.name.toLowerCase().trim()){
+      last.endTime = b.endTime;
+      last.mins += b.mins;
+      last.count++;
+    } else {
+      merged.push({...b, count:1});
+    }
+  });
+
+  // === Aggregate by activity name (for "top activities") ===
+  const activityTime = new Map();
+  const activityTag = new Map();
+  blocks.forEach(b=>{
+    const key = b.name.toLowerCase().trim();
+    activityTime.set(key, (activityTime.get(key)||0) + b.mins);
+    if(!activityTag.has(key)) activityTag.set(key, {tag:b.tag, cat:b.cat, expanded:b.expanded});
+  });
+  const ranked = Array.from(activityTime.entries()).sort((a,b)=> b[1]-a[1]);
+
+  // === Aggregate by tag category ===
+  const catLabels = {good:'produttivo', bad:'spreco', neutral:'neutro', non:'routine'};
+
+  // === Key moments ===
+  const wakeTime = dayActs[0].timestamp.slice(11,16);
+  const lastTime = dayActs[dayActs.length-1].timestamp.slice(11,16);
+  const wakeExpanded = expandActivity(dayActs[0].activity, dayActs[0].tag);
+  const lastExpanded = expandActivity(dayActs[dayActs.length-1].activity, dayActs[dayActs.length-1].tag);
+
+  // === Verdict ===
+  let emoji, title, verdictClass;
+  const goodPct = Math.round((health.good / health.total) * 100);
+  const badPct  = Math.round((health.bad / health.total) * 100);
+  const nonPct  = Math.round((health.non / health.total) * 100);
+
+  if(health.health === 'good'){
+    if(goodPct >= 60) { emoji='🔥'; title='Giornata super produttiva'; }
+    else { emoji='💪'; title='Giornata produttiva'; }
+    verdictClass = 'good';
+  } else if(health.health === 'bad'){
+    if(badPct >= 60) { emoji='💤'; title='Giornata persa'; }
+    else { emoji='😴'; title='Giornata da recuperare'; }
+    verdictClass = 'bad';
+  } else {
+    if(nonPct >= 70) { emoji='⚙️'; title='Giornata di routine'; }
+    else if(health.good > 0 && health.bad > 0) { emoji='⚖️'; title='Giornata mista'; }
+    else { emoji='📋'; title='Giornata tranquilla'; }
+    verdictClass = nonPct >= 70 ? 'non' : 'neutral';
+  }
+
+  // === Build chronological narrative ===
+  const parts = [];
+
+  // 1. Wake / start of day
+  const wakeIsWake = ['wake','wakeup','wake up','sveglia'].includes(dayActs[0].activity.toLowerCase().trim());
+  if(wakeIsWake){
+    const wakeH = parseInt(wakeTime.split(':')[0]);
+    const wakeComment = wakeH <= 6 ? ' (mattiniero!)' : wakeH >= 10 ? ' (tardi)' : '';
+    parts.push(`Sveglia alle <span class="highlight">${wakeTime}</span>${wakeComment}`);
+  } else {
+    parts.push(`Giornata iniziata alle ${wakeTime} con <span class="highlight">${escapeHtml(wakeExpanded)}</span>`);
+  }
+
+  // 2. Tell the story of what happened — group into phases (morning/afternoon/evening)
+  const morning = merged.filter(b=> b.startTime < '12:00' && !isTransition(b.name));
+  const afternoon = merged.filter(b=> b.startTime >= '12:00' && b.startTime < '18:00' && !isTransition(b.name));
+  const evening = merged.filter(b=> b.startTime >= '18:00' && !isTransition(b.name));
+
+  function describePhase(phaseName, phaseBlocks){
+    if(phaseBlocks.length === 0) return null;
+    // Find the dominant activity in this phase
+    const sorted = [...phaseBlocks].sort((a,b)=> b.mins - a.mins);
+    const top = sorted[0];
+    const topPct = Math.round((top.mins / phaseBlocks.reduce((s,b)=>s+b.mins,0)) * 100);
+
+    if(sorted.length === 1 || topPct >= 70){
+      // One thing dominated this phase
+      const catEmoji = {good:'✅', bad:'❌', neutral:'➖', non:'⚙️'}[top.cat] || '';
+      return `${phaseName}: <span class="highlight">${escapeHtml(top.expanded)}</span> (${fmtMins(top.mins)}) ${catEmoji}`;
+    } else {
+      // Multiple activities
+      const names = sorted.slice(0,2).map(b=> escapeHtml(b.expanded));
+      return `${phaseName}: ${names.join(' e ')}`;
+    }
+  }
+
+  const mDesc = describePhase('Mattina', morning);
+  const aDesc = describePhase('Pomeriggio', afternoon);
+  const eDesc = describePhase('Sera', evening);
+  if(mDesc) parts.push(mDesc);
+  if(aDesc) parts.push(aDesc);
+  if(eDesc) parts.push(eDesc);
+
+  // 3. Highlight the single biggest time sink if it dominates the whole day
+  const topAct = ranked[0];
+  const topInfo = activityTag.get(topAct[0]);
+  const topPct = Math.round((topAct[1] / health.total) * 100);
+  if(topPct >= 45 && !isTransition(topAct[0])){
+    const catComment = topInfo.cat === 'good' ? ' — ben speso!' :
+                       topInfo.cat === 'bad' ? ' — forse troppo?' : '';
+    parts.push(`Tempo principale: <span class="highlight">${escapeHtml(topInfo.expanded)}</span> (~${fmtMins(topAct[1])}, ${topPct}%)${catComment}`);
+  }
+
+  // 4. Mention Entertainment/shows/series if they show up (recognize "watching" pattern)
+  ranked.forEach(([name, mins])=>{
+    const info = activityTag.get(name);
+    if(info.cat === 'bad' && mins >= 60 && !isTransition(name)){
+      const alreadyMentioned = parts.some(p=> p.toLowerCase().includes(name));
+      if(!alreadyMentioned){
+        parts.push(`<span class="highlight">${escapeHtml(info.expanded)}</span> per ${fmtMins(mins)} (${info.tag})`);
+      }
+    }
+  });
+
+  // 5. End of day
+  if(lastTime >= '23:00'){
+    parts.push(`Giornata lunga, chiusa alle ${lastTime}`);
+  } else if(lastTime >= '21:00'){
+    parts.push(`Fine giornata alle ${lastTime}`);
+  }
+
+  // === Render ===
+  recapEl.classList.remove('hidden');
+  recapEl.innerHTML = `
+    <h4 class="section-label">🧠 Riepilogo</h4>
+    <div class="recap-box ${verdictClass}">
+      <div class="recap-header">
+        <span class="recap-emoji">${emoji}</span>
+        <span class="recap-title">${title}</span>
+      </div>
+      <div class="recap-text">${parts.join('. ')}.</div>
+      <div class="recap-meta">
+        <span>⏱️ ${fmtMins(health.total)} tracciati</span>
+        <span>📊 ${dayActs.length} attività</span>
+        <span>🕐 ${wakeTime} → ${lastTime}</span>
+        ${goodPct > 0 ? `<span>✅ ${goodPct}% produttivo</span>` : ''}
+        ${badPct > 0 ? `<span>❌ ${badPct}% spreco</span>` : ''}
+      </div>
+    </div>
+  `;
+}
+
+/* ===== Note Loading & Auto-Save ===== */
+async function loadDayNote(dateStr){
+  // Clear any pending save for previous day
+  if(noteTimer){ clearTimeout(noteTimer); noteTimer = null; }
+
+  if(noteCache.has(dateStr)){
+    $('#dayNote').value = noteCache.get(dateStr) || '';
+    updateCharCount();
+    setSaveStatus(noteCache.get(dateStr) ? 'saved' : '');
+    return;
+  }
+
+  setSaveStatus('');
+  let content = '';
+  try {
+    const doc = await noteCol(currentUid).doc(dateStr).get();
+    content = doc.exists ? (doc.data().content || '') : '';
+  } catch(e) {
+    console.warn('Note load failed (rules may not be deployed yet):', e.code);
+  }
+  noteCache.set(dateStr, content);
+  $('#dayNote').value = content;
+  updateCharCount();
+  setSaveStatus(content ? 'saved' : '');
+}
+
+async function saveDayNote(dateStr, content){
+  setSaveStatus('saving');
+
+  try {
+    if(content.trim() === ''){
+      await noteCol(currentUid).doc(dateStr).delete();
+    } else {
+      await noteCol(currentUid).doc(dateStr).set({
+        content: content,
+        updatedAt: new Date().toISOString()
+      }, {merge: true});
+    }
+
+    noteCache.set(dateStr, content);
+    // Update note days cache
+    const monthKey = dateStr.slice(0,7);
+    if(noteDaysCache.has(monthKey)){
+      const days = noteDaysCache.get(monthKey);
+      if(content.trim()) days.add(dateStr); else days.delete(dateStr);
+    }
+    setSaveStatus('saved');
+    // Re-render calendar to update dot indicators
+    renderCalendar();
+  } catch(e) {
+    console.warn('Note save failed:', e.code);
+    setSaveStatus('error');
+  }
+}
+
+function setupNoteAutoSave(){
+  const ta = $('#dayNote');
+  ta.addEventListener('input', ()=>{
+    updateCharCount();
+    if(!selectedDate) return;
+    if(noteTimer) clearTimeout(noteTimer);
+    setSaveStatus('typing');
+    noteTimer = setTimeout(()=>{
+      saveDayNote(selectedDate, ta.value);
+    }, NOTE_DEBOUNCE);
+  });
+}
+
+function updateCharCount(){
+  const len = $('#dayNote').value.length;
+  $('#charCount').textContent = `${len} / ${MAX_NOTE}`;
+}
+
+function setSaveStatus(s){
+  const el = $('#saveStatus');
+  el.className = 'save-status';
+  switch(s){
+    case 'typing':  el.textContent = 'Digitazione...'; break;
+    case 'saving':  el.textContent = 'Salvataggio...'; el.classList.add('saving'); break;
+    case 'saved':   el.textContent = 'Salvato ✓'; el.classList.add('saved'); break;
+    case 'error':   el.textContent = 'Errore ✗'; el.classList.add('error'); break;
+    default:        el.textContent = '';
+  }
+}
+
+/* ===== Month Navigation ===== */
+function navMonth(offset){
+  viewMonth = new Date(viewMonth.getFullYear(), viewMonth.getMonth() + offset, 1);
+  selectedDate = null;
+  $('#dayDetail').classList.add('hidden');
+  renderCalendar();
+}
+
+/* ===== Boot ===== */
+initNetworkDetection();
+
+auth.onAuthStateChanged(async u=>{
+  if(!u){ location.href='../index.html'; return; }
+  currentUid = u.uid;
+  $('#userLabel').textContent = u.email || u.uid;
+
+  await SettingsService.loadSettings(u.uid);
+
+  viewMonth = new Date();
+  await renderCalendar();
+
+  // Select today by default
+  selectDay(todayYMD());
+
+  setupNoteAutoSave();
+});
+
+$('#prevMonth').addEventListener('click', ()=> navMonth(-1));
+$('#nextMonth').addEventListener('click', ()=> navMonth(1));
+$('#todayBtn').addEventListener('click', ()=>{
+  viewMonth = new Date();
+  selectedDate = todayYMD();
+  renderCalendar().then(()=> selectDay(todayYMD()));
+});
+</script>
+
+<!-- UI Enhancements -->
+<script src="../js/ui-enhancements.js"></script>
+<script>
+  initUIEnhancements({
+    onRefresh: async () => {
+      if(currentUid){
+        // Clear caches and re-fetch
+        actCache.clear();
+        noteDaysCache.clear();
+        noteCache.clear();
+        await renderCalendar();
+        if(selectedDate) await selectDay(selectedDate);
+        showToast('✅ Aggiornato');
+      }
+    }
+  });
+</script>
+</body>
+</html>

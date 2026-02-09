@@ -41,6 +41,17 @@ service cloud.firestore {
         allow delete: if isOwner(userId);
       }
 
+      // Notes sub-collection (daily notes)
+      match /notes/{noteId} {
+        allow read: if isOwner(userId);
+        allow create, update: if isOwner(userId)
+          && request.resource.data.keys().hasAll(['content', 'updatedAt'])
+          && request.resource.data.content is string
+          && request.resource.data.updatedAt is string
+          && request.resource.data.content.size() <= 5000;
+        allow delete: if isOwner(userId);
+      }
+
       // Settings sub-collection (user preferences, custom tags)
       match /settings/{settingId} {
         allow read: if isOwner(userId);
