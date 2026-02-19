@@ -1,0 +1,672 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8" />
+  <title>Quick Buttons — Mock Test</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <script>
+    // Pre-init theme (matches real app logic)
+    (function(){
+      const saved = localStorage.getItem('tt_theme');
+      const prefDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+      document.documentElement.setAttribute('data-theme', saved || (prefDark ? 'dark' : 'light'));
+    })();
+  </script>
+  <style>
+    /* ===== Theme Variables (copied from real app) ===== */
+    :root[data-theme="light"]{
+      --brand:#c9a227; --brand-light:#f8f4e8; --brand-dark:#a8871f;
+      --bg:#fafaf8; --text:#2c2c2c; --muted:#777; --card:#ffffff; --border:#e8e4d8;
+      --good:#06c167; --good-bg:#e9fff4; --good-border:#06c167;
+      --bad:#ff2d55;  --bad-bg:#fff0f3;  --bad-border:#ff2d55;
+      --toast:#2c2c2c; --toastText:#fff;
+      --overlay:rgba(0,0,0,0.45);
+    }
+    :root[data-theme="dark"]{
+      --brand:#c9a227; --brand-light:#2a2518; --brand-dark:#a8871f;
+      --bg:#18171a; --text:#e8e6e3; --muted:#999; --card:#222024; --border:#3a3838;
+      --good:#22d47b; --good-bg:#0d2a1e; --good-border:#22d47b;
+      --bad:#ff4d6d;  --bad-bg:#2a0d13;  --bad-border:#ff4d6d;
+      --toast:#222; --toastText:#eaeaea;
+      --overlay:rgba(0,0,0,0.65);
+    }
+
+    /* ===== Base ===== */
+    *, *::before, *::after { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    html, body { height: 100%; margin: 0; }
+    body {
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial;
+      color: var(--text); background: var(--bg);
+      padding: 16px;
+      padding-left: max(16px, env(safe-area-inset-left));
+      padding-right: max(16px, env(safe-area-inset-right));
+    }
+
+    /* ===== Card ===== */
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px;
+      margin: 12px 0;
+      position: relative;
+      overflow: hidden;
+    }
+    .card::before {
+      content: '';
+      position: absolute; top: 0; left: 0; right: 0;
+      height: 3px; background: var(--brand);
+    }
+
+    /* ===== Dev Controls ===== */
+    .dev-banner {
+      background: #1a1a2e;
+      color: #e8e6ff;
+      border-radius: 10px;
+      padding: 12px 16px;
+      margin-bottom: 12px;
+      font-size: 12px;
+      display: flex; flex-wrap: wrap; align-items: center; gap: 10px;
+    }
+    .dev-banner strong { color: #a78bfa; font-size: 13px; }
+    .dev-ctl {
+      display: flex; align-items: center; gap: 6px;
+      padding: 4px 10px;
+      border-radius: 6px; border: 1px solid #3a3860;
+      cursor: pointer; background: transparent; color: #e8e6ff;
+      font-size: 12px; transition: background 0.15s;
+    }
+    .dev-ctl:hover { background: #2a2a4e; }
+    .dev-ctl.active { background: #2a2a4e; border-color: #a78bfa; color: #a78bfa; }
+    .dev-sep { color: #3a3860; }
+
+    /* ===== Network mode indicator ===== */
+    .net-badge {
+      font-size: 11px; padding: 2px 8px; border-radius: 20px; font-weight: 600;
+    }
+    .net-badge.fast  { background: #e9fff4; color: #06c167; }
+    .net-badge.slow  { background: #fff8e1; color: #c9a227; }
+    .net-badge.fail  { background: #fff0f3; color: #ff2d55; }
+    [data-theme="dark"] .net-badge.fast  { background: #0d2a1e; color: #22d47b; }
+    [data-theme="dark"] .net-badge.slow  { background: #2a2518; color: #c9a227; }
+    [data-theme="dark"] .net-badge.fail  { background: #2a0d13; color: #ff4d6d; }
+
+    /* ===== Section title ===== */
+    .templates-header {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 12px;
+    }
+    .templates-title {
+      font-size: 12px; color: var(--muted);
+      text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600;
+    }
+    .templates-edit-btn {
+      font-size: 12px; color: var(--brand);
+      cursor: pointer; border: none; background: none; padding: 4px 8px;
+      border-radius: 6px; transition: background 0.15s;
+    }
+    .templates-edit-btn:hover { background: var(--brand-light); text-decoration: underline; }
+
+    /* ===== Templates Grid ===== */
+    .templates-grid {
+      display: flex; flex-wrap: wrap; gap: 8px;
+    }
+
+    /* ===== IMPROVED: Template Chip ===== */
+    .template-chip {
+      display: flex; align-items: center; gap: 10px;
+      padding: 12px 16px;          /* was 10px 14px */
+      min-height: 54px;            /* NEW: explicit touch target */
+      background: var(--brand-light);
+      border: 1.5px solid var(--border);
+      border-radius: 12px;
+      cursor: pointer;
+      transition: border-color 0.2s, box-shadow 0.2s, transform 0.15s, background 0.2s;
+      position: relative;
+      overflow: hidden;
+      user-select: none;
+    }
+    .template-chip:hover {
+      border-color: var(--brand);
+      transform: translateY(-2px);
+      box-shadow: 0 4px 14px rgba(201,162,39,0.22);
+    }
+    .template-chip:active { transform: scale(0.97); }
+
+    .template-chip .emoji { font-size: 20px; flex-shrink: 0; }  /* was 18px */
+    .template-chip .info  { min-width: 0; overflow: hidden; }
+
+    .template-chip .tpl-name {
+      font-weight: 600; font-size: 13px;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+
+    /* IMPROVED: tag as a small colored badge */
+    .template-chip .tpl-tag {
+      display: inline-block;
+      margin-top: 3px;
+      font-size: 10px; font-weight: 600; letter-spacing: 0.3px;
+      color: var(--brand-dark);
+      background: rgba(201,162,39,0.15);
+      padding: 1px 6px;
+      border-radius: 4px;
+    }
+    [data-theme="dark"] .template-chip .tpl-tag {
+      color: #d4b43a;
+      background: rgba(201,162,39,0.18);
+    }
+
+    /* ===== Loading state ===== */
+    .template-chip.loading {
+      pointer-events: none;
+      opacity: 0.75;
+    }
+    .template-chip.loading::after {
+      content: '';
+      position: absolute; inset: 0;
+      background: linear-gradient(90deg,
+        transparent 0%, rgba(201,162,39,0.12) 50%, transparent 100%);
+      background-size: 200% 100%;
+      animation: shimmer 1s infinite;
+    }
+    @keyframes shimmer {
+      0%   { background-position: -200% 0; }
+      100% { background-position:  200% 0; }
+    }
+
+    /* ===== Success state ===== */
+    .template-chip.added {
+      background: var(--good-bg);
+      border-color: var(--good-border);
+    }
+    .template-chip.added .tpl-name { color: var(--good); }
+    .template-chip.added .tpl-tag  { color: var(--good); background: rgba(6,193,103,0.12); }
+
+    /* ===== Error state (NEW) ===== */
+    .template-chip.error {
+      background: var(--bad-bg);
+      border-color: var(--bad-border);
+      animation: shake 0.35s ease;
+    }
+    .template-chip.error .tpl-name { color: var(--bad); }
+    @keyframes shake {
+      0%,100% { transform: translateX(0); }
+      25%      { transform: translateX(-5px); }
+      75%      { transform: translateX(5px); }
+    }
+
+    /* ===== Add button ===== */
+    .template-add {
+      padding: 12px 16px;
+      min-height: 54px;
+      background: transparent;
+      border: 2px dashed var(--border);
+      border-radius: 12px;
+      cursor: pointer;
+      color: var(--muted);
+      font-size: 13px;
+      display: flex; align-items: center; gap: 6px;
+      transition: border-color 0.2s, color 0.2s, background 0.2s;
+      font-family: inherit;
+    }
+    .template-add:hover { border-color: var(--brand); color: var(--brand); background: var(--brand-light); }
+
+    /* ===== Divider ===== */
+    .divider {
+      display: flex; align-items: center; gap: 12px;
+      margin: 16px 0; color: var(--muted); font-size: 12px;
+    }
+    .divider::before, .divider::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+    /* ===== Toast ===== */
+    #toast {
+      position: fixed; bottom: max(24px, env(safe-area-inset-bottom));
+      left: 50%; transform: translateX(-50%) translateY(16px);
+      background: var(--toast); color: var(--toastText);
+      padding: 10px 18px; border-radius: 24px;
+      font-size: 13px; font-weight: 500;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.22);
+      opacity: 0; transition: opacity 0.25s, transform 0.25s;
+      pointer-events: none; white-space: nowrap; z-index: 9999;
+    }
+    #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+    /* ===== Inline Add Modal (NEW) ===== */
+    .modal-overlay {
+      position: fixed; inset: 0;
+      background: var(--overlay);
+      display: flex; align-items: flex-end; justify-content: center;
+      z-index: 1000;
+      opacity: 0; pointer-events: none;
+      transition: opacity 0.25s;
+    }
+    .modal-overlay.open { opacity: 1; pointer-events: all; }
+
+    .modal-sheet {
+      background: var(--card);
+      border-radius: 20px 20px 0 0;
+      padding: 20px 20px max(20px, env(safe-area-inset-bottom));
+      width: 100%; max-width: 520px;
+      transform: translateY(100%);
+      transition: transform 0.3s cubic-bezier(0.32, 0.72, 0, 1);
+      border-top: 3px solid var(--brand);
+    }
+    .modal-overlay.open .modal-sheet { transform: translateY(0); }
+
+    .modal-handle {
+      width: 40px; height: 4px; border-radius: 2px;
+      background: var(--border); margin: 0 auto 16px;
+    }
+    .modal-title {
+      font-size: 16px; font-weight: 700; margin: 0 0 16px;
+    }
+    .modal-row {
+      display: flex; gap: 8px; margin-bottom: 10px;
+    }
+    .emoji-picker-btn {
+      font-size: 22px; padding: 8px 10px;
+      background: var(--brand-light); border: 1.5px solid var(--border);
+      border-radius: 8px; cursor: pointer;
+      transition: border-color 0.2s; flex-shrink: 0;
+    }
+    .emoji-picker-btn:hover { border-color: var(--brand); }
+
+    .modal-row input, .modal-row select {
+      flex: 1; padding: 10px 12px;
+      background: var(--bg); color: var(--text);
+      border: 1.5px solid var(--border); border-radius: 8px;
+      font-size: 14px; font-family: inherit;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    .modal-row input:focus, .modal-row select:focus {
+      outline: none; border-color: var(--brand);
+      box-shadow: 0 0 0 3px rgba(201,162,39,0.15);
+    }
+    .modal-actions { display: flex; gap: 8px; margin-top: 14px; }
+    .btn-save {
+      flex: 1; padding: 12px;
+      background: var(--brand); color: #fff;
+      border: none; border-radius: 10px;
+      font-size: 14px; font-weight: 600; cursor: pointer;
+      transition: background 0.2s, transform 0.15s;
+    }
+    .btn-save:hover { background: var(--brand-dark); }
+    .btn-save:active { transform: scale(0.97); }
+    .btn-cancel {
+      padding: 12px 16px;
+      background: transparent; color: var(--muted);
+      border: 1.5px solid var(--border); border-radius: 10px;
+      font-size: 14px; cursor: pointer;
+      transition: border-color 0.2s, color 0.2s;
+    }
+    .btn-cancel:hover { border-color: var(--brand); color: var(--brand); }
+
+    /* Emoji picker dropdown */
+    .emoji-grid-wrap {
+      position: relative;
+    }
+    .emoji-grid {
+      display: none;
+      position: absolute; left: 0; bottom: calc(100% + 6px);
+      background: var(--card); border: 1.5px solid var(--border);
+      border-radius: 10px; padding: 8px;
+      display: none; flex-wrap: wrap; gap: 4px;
+      width: 220px; box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+      z-index: 10;
+    }
+    .emoji-grid.open { display: flex; }
+    .emoji-opt {
+      font-size: 22px; padding: 4px 6px;
+      cursor: pointer; border-radius: 6px;
+      transition: background 0.15s;
+    }
+    .emoji-opt:hover { background: var(--brand-light); }
+
+    /* ===== Activity Log ===== */
+    .log-section {
+      margin-top: 8px;
+    }
+    .log-title {
+      font-size: 11px; color: var(--muted);
+      text-transform: uppercase; letter-spacing: 0.5px;
+      margin-bottom: 8px; font-weight: 600;
+    }
+    .log-entry {
+      display: flex; align-items: center; gap: 10px;
+      padding: 8px 10px;
+      border-radius: 8px; border: 1px solid var(--border);
+      margin-bottom: 6px; font-size: 13px;
+      animation: slideIn 0.25s ease-out;
+    }
+    @keyframes slideIn {
+      from { opacity: 0; transform: translateY(-6px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .log-emoji { font-size: 16px; flex-shrink: 0; }
+    .log-name  { font-weight: 600; flex: 1; }
+    .log-tag   {
+      font-size: 10px; font-weight: 600;
+      color: var(--brand-dark); background: rgba(201,162,39,0.15);
+      padding: 2px 6px; border-radius: 4px;
+    }
+    .log-time  { font-size: 11px; color: var(--muted); flex-shrink: 0; }
+    .log-empty { font-size: 13px; color: var(--muted); padding: 8px 0; }
+
+    /* ===== Section heading ===== */
+    h3 { margin: 0 0 16px; font-size: 17px; }
+    .muted { color: var(--muted); }
+  </style>
+</head>
+<body>
+
+  <!-- Dev Controls Banner -->
+  <div class="dev-banner">
+    <strong>🧪 Mock Test</strong>
+    <span class="dev-sep">|</span>
+    <button class="dev-ctl" id="themeToggle">🌙 Tema</button>
+    <span class="dev-sep">|</span>
+    <span style="font-size:11px; color:#a0a0c0;">Rete:</span>
+    <button class="dev-ctl active" id="netFast"  onclick="setNet('fast')">⚡ Veloce <span class="net-badge fast">~300ms</span></button>
+    <button class="dev-ctl"        id="netSlow"  onclick="setNet('slow')">🐢 Lenta  <span class="net-badge slow">~2s</span></button>
+    <button class="dev-ctl"        id="netFail"  onclick="setNet('fail')">💥 Errore <span class="net-badge fail">sempre</span></button>
+  </div>
+
+  <!-- Main Card -->
+  <div class="card">
+    <h3>📥 Inserisci attività</h3>
+
+    <!-- Quick Templates -->
+    <div class="templates-section" id="templatesSection">
+      <div class="templates-header">
+        <span class="templates-title">⚡ Quick Templates</span>
+        <button class="templates-edit-btn" onclick="openAddModal()">+ Aggiungi</button>
+      </div>
+      <div class="templates-grid" id="templatesGrid"></div>
+    </div>
+
+    <div class="divider">oppure inserisci manualmente</div>
+    <input type="text" placeholder="Attività…"
+      style="width:100%;padding:10px 12px;border:1.5px solid var(--border);
+             border-radius:8px;background:var(--bg);color:var(--text);
+             font-size:14px;font-family:inherit;">
+
+  </div>
+
+  <!-- Activity Log Card -->
+  <div class="card log-section">
+    <div class="log-title">Attività salvate (mock)</div>
+    <div id="logList"><div class="log-empty muted">Nessuna attività ancora — prova a toccare un template!</div></div>
+  </div>
+
+  <!-- Toast -->
+  <div id="toast"></div>
+
+  <!-- Inline Add Modal (NEW - no navigation away) -->
+  <div class="modal-overlay" id="modalOverlay" onclick="handleOverlayClick(event)">
+    <div class="modal-sheet" onclick="event.stopPropagation()">
+      <div class="modal-handle"></div>
+      <div class="modal-title">Nuovo template</div>
+      <div class="modal-row">
+        <div class="emoji-grid-wrap" id="emojiWrap">
+          <button class="emoji-picker-btn" id="emojiBtn" onclick="toggleEmojiGrid()" type="button">📌</button>
+          <div class="emoji-grid" id="emojiGrid"></div>
+        </div>
+        <input type="text" id="newName" placeholder="Nome (es. Pausa caffè)" maxlength="50">
+      </div>
+      <div class="modal-row">
+        <select id="newTag">
+          <option value="">-- Tag --</option>
+          <option value="Sleep">Sleep</option>
+          <option value="Work">Work</option>
+          <option value="Sport">Sport</option>
+          <option value="Food">Food</option>
+          <option value="Social">Social</option>
+          <option value="Hobby">Hobby</option>
+          <option value="Health">Health</option>
+          <option value="Travel">Travel</option>
+        </select>
+      </div>
+      <div class="modal-actions">
+        <button class="btn-cancel" onclick="closeAddModal()">Annulla</button>
+        <button class="btn-save" onclick="saveNewTemplate()">Aggiungi template</button>
+      </div>
+    </div>
+  </div>
+
+<script>
+  // ===== State =====
+  const EMOJIS = ['📌','🌅','☕','🏃','🍕','💪','📚','🎮','😴','💼',
+                  '🎵','✈️','🏠','🧘','🚴','🍎','🎯','🧠','🌙','⚡'];
+  let netMode = 'fast'; // 'fast' | 'slow' | 'fail'
+  let selectedEmoji = '📌';
+  let lastRateLimit = 0;
+  const RATE_LIMIT_MS = 1000;
+
+  let templates = [
+    { id: 't1', emoji: '🌅', name: 'Wake',         tag: 'Sleep'  },
+    { id: 't2', emoji: '☕', name: 'Caffè',         tag: 'Food'   },
+    { id: 't3', emoji: '💪', name: 'Allenamento',   tag: 'Sport'  },
+    { id: 't4', emoji: '😴', name: 'Coricato',      tag: 'Sleep'  },
+    { id: 't5', emoji: '💼', name: 'Inizio lavoro', tag: 'Work'   },
+  ];
+
+  const activityLog = [];
+
+  // ===== Theme Toggle =====
+  document.getElementById('themeToggle').addEventListener('click', () => {
+    const current = document.documentElement.getAttribute('data-theme');
+    const next = current === 'dark' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', next);
+    localStorage.setItem('tt_theme', next);
+    document.getElementById('themeToggle').textContent = next === 'dark' ? '☀️ Tema' : '🌙 Tema';
+  });
+
+  // ===== Network mode =====
+  function setNet(mode) {
+    netMode = mode;
+    ['fast','slow','fail'].forEach(m => {
+      document.getElementById('net' + m.charAt(0).toUpperCase() + m.slice(1))
+        .classList.toggle('active', m === mode);
+    });
+  }
+
+  // Simulate Firestore save
+  function fakeSave(record) {
+    const delay = netMode === 'fast' ? 300 + Math.random()*200
+                : netMode === 'slow' ? 1800 + Math.random()*600
+                : 400;
+    return new Promise((resolve, reject) => {
+      setTimeout(() => {
+        if (netMode === 'fail') reject(new Error('Network error'));
+        else resolve({ id: 'mock_' + Date.now() });
+      }, delay);
+    });
+  }
+
+  // ===== Toast =====
+  let toastTimer;
+  function showToast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => t.classList.remove('show'), 2800);
+  }
+
+  // ===== Escape HTML =====
+  function esc(s) {
+    return String(s)
+      .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+      .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  // ===== Render Templates =====
+  function renderTemplates() {
+    const grid = document.getElementById('templatesGrid');
+    grid.innerHTML = '';
+    templates.forEach(tpl => {
+      const chip = document.createElement('div');
+      chip.className = 'template-chip';
+      chip.dataset.id = tpl.id;
+      chip.innerHTML = `
+        <span class="emoji">${esc(tpl.emoji || '📌')}</span>
+        <div class="info">
+          <div class="tpl-name">${esc(tpl.name)}</div>
+          <div class="tpl-tag">${esc(tpl.tag)}</div>
+        </div>
+      `;
+      chip.addEventListener('click', () => quickAdd(chip, tpl));
+      grid.appendChild(chip);
+    });
+  }
+
+  // ===== IMPROVED: Quick Add =====
+  async function quickAdd(chip, tpl) {
+    // Rate limiting with clear message
+    const now = Date.now();
+    const elapsed = now - lastRateLimit;
+    if (elapsed < RATE_LIMIT_MS) {
+      const remaining = Math.ceil((RATE_LIMIT_MS - elapsed) / 1000);
+      showToast(`⏱️ Attendi ancora ${remaining}s`);
+      return;
+    }
+    lastRateLimit = now;
+
+    const record = {
+      activity: tpl.name,
+      tag: tpl.tag,
+      emoji: tpl.emoji,
+      timestamp: new Date().toISOString(),
+    };
+
+    // 1. Show LOADING state (not success yet)
+    chip.classList.add('loading');
+
+    try {
+      await fakeSave(record);
+
+      // 2. Show SUCCESS only after save completes
+      chip.classList.remove('loading');
+      chip.classList.add('added');
+      showToast(`✅ "${esc(tpl.name)}" aggiunto!`);
+      addToLog(record);
+      setTimeout(() => chip.classList.remove('added'), 1500);
+
+    } catch (err) {
+      // 3. Show ERROR state with shake animation
+      chip.classList.remove('loading');
+      chip.classList.add('error');
+      showToast(`❌ Errore nel salvataggio`);
+      setTimeout(() => chip.classList.remove('error'), 1500);
+    }
+  }
+
+  // ===== Activity Log =====
+  function addToLog(record) {
+    activityLog.unshift(record);
+    const list = document.getElementById('logList');
+    // Remove empty state
+    const empty = list.querySelector('.log-empty');
+    if (empty) empty.remove();
+    // Insert at top
+    const entry = document.createElement('div');
+    entry.className = 'log-entry';
+    const t = new Date(record.timestamp);
+    const timeStr = t.toLocaleTimeString('it-IT', { hour:'2-digit', minute:'2-digit', second:'2-digit' });
+    entry.innerHTML = `
+      <span class="log-emoji">${esc(record.emoji || '📌')}</span>
+      <span class="log-name">${esc(record.activity)}</span>
+      <span class="log-tag">${esc(record.tag)}</span>
+      <span class="log-time">${timeStr}</span>
+    `;
+    list.insertBefore(entry, list.firstChild);
+  }
+
+  // ===== Inline Add Modal (no navigation away) =====
+  function openAddModal() {
+    document.getElementById('modalOverlay').classList.add('open');
+    document.getElementById('newName').focus();
+  }
+  function closeAddModal() {
+    document.getElementById('modalOverlay').classList.remove('open');
+    // Reset form
+    selectedEmoji = '📌';
+    document.getElementById('emojiBtn').textContent = '📌';
+    document.getElementById('newName').value = '';
+    document.getElementById('newTag').value = '';
+    document.getElementById('emojiGrid').classList.remove('open');
+  }
+  function handleOverlayClick(e) {
+    if (e.target === document.getElementById('modalOverlay')) closeAddModal();
+  }
+  function saveNewTemplate() {
+    const name = document.getElementById('newName').value.trim();
+    const tag  = document.getElementById('newTag').value;
+    if (!name) {
+      document.getElementById('newName').focus();
+      showToast('⚠️ Inserisci un nome');
+      return;
+    }
+    if (!tag) {
+      document.getElementById('newTag').focus();
+      showToast('⚠️ Seleziona un tag');
+      return;
+    }
+    const newTpl = {
+      id: 't' + Date.now(),
+      emoji: selectedEmoji,
+      name,
+      tag,
+    };
+    templates.push(newTpl);
+    renderTemplates();
+    closeAddModal();
+    showToast(`✅ Template "${esc(name)}" aggiunto!`);
+    // Scroll to the new chip briefly
+    setTimeout(() => {
+      const chip = document.querySelector(`.template-chip[data-id="${newTpl.id}"]`);
+      if (chip) {
+        chip.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        chip.classList.add('added');
+        setTimeout(() => chip.classList.remove('added'), 1200);
+      }
+    }, 50);
+  }
+
+  // ===== Emoji Picker =====
+  function buildEmojiGrid() {
+    const grid = document.getElementById('emojiGrid');
+    grid.innerHTML = '';
+    EMOJIS.forEach(e => {
+      const span = document.createElement('span');
+      span.className = 'emoji-opt';
+      span.textContent = e;
+      span.onclick = () => {
+        selectedEmoji = e;
+        document.getElementById('emojiBtn').textContent = e;
+        document.getElementById('emojiGrid').classList.remove('open');
+      };
+      grid.appendChild(span);
+    });
+  }
+  function toggleEmojiGrid() {
+    document.getElementById('emojiGrid').classList.toggle('open');
+  }
+  // Close emoji grid when clicking outside
+  document.addEventListener('click', e => {
+    const wrap = document.getElementById('emojiWrap');
+    if (wrap && !wrap.contains(e.target)) {
+      document.getElementById('emojiGrid').classList.remove('open');
+    }
+  });
+
+  // ===== Init =====
+  buildEmojiGrid();
+  renderTemplates();
+
+  // Set initial theme button label
+  const currentTheme = document.documentElement.getAttribute('data-theme');
+  document.getElementById('themeToggle').textContent = currentTheme === 'dark' ? '☀️ Tema' : '🌙 Tema';
+</script>
+</body>
+</html>
