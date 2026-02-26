@@ -1,0 +1,461 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8" />
+  <title>Mock — IN/OUT Quick Templates</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+
+  <script>
+    /* Pre-init theme */
+    (function(){
+      const saved = localStorage.getItem('tt_theme');
+      const prefDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+      const theme = saved || (prefDark ? 'dark' : 'light');
+      document.documentElement.setAttribute('data-theme', theme);
+    })();
+  </script>
+
+  <style>
+    /* ===== Theme Vars (copied from app) ===== */
+    :root[data-theme="light"] {
+      --brand:#c9a227; --brand-light:#f8f4e8; --brand-dark:#a8871f;
+      --bg:#fafaf8; --text:#2c2c2c; --muted:#777; --card:#ffffff; --border:#e8e4d8;
+      --good:#06c167; --bad:#ff2d55;
+      --in-bg:#edfaf3; --in-border:#06c167; --in-text:#057a45;
+      --out-bg:#fff0f3; --out-border:#ff2d55; --out-text:#cc1a3a;
+    }
+    :root[data-theme="dark"] {
+      --brand:#c9a227; --brand-light:#2a2518; --brand-dark:#a8871f;
+      --bg:#18171a; --text:#e8e6e3; --muted:#999; --card:#222024; --border:#3a3838;
+      --good:#22d47b; --bad:#ff4d6d;
+      --in-bg:#0d2a1e; --in-border:#22d47b; --in-text:#22d47b;
+      --out-bg:#2a0f15; --out-border:#ff4d6d; --out-text:#ff4d6d;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    body {
+      margin: 0; padding: 16px;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial;
+      color: var(--text); background: var(--bg);
+      max-width: 560px; margin: 0 auto;
+    }
+
+    /* ===== Page header ===== */
+    .page-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 12px 0 20px;
+    }
+    .page-header h1 { margin: 0; font-size: 17px; font-weight: 700; }
+    .theme-toggle {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: 999px; padding: 6px 12px;
+      cursor: pointer; font-size: 13px; color: var(--muted);
+    }
+
+    /* ===== Card ===== */
+    .card {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: 14px; padding: 16px; margin-bottom: 16px;
+      position: relative; overflow: hidden;
+    }
+    .card::before {
+      content: ''; position: absolute; top: 0; left: 0; right: 0;
+      height: 3px; background: var(--brand);
+    }
+    .card h3 { margin: 0 0 14px; font-size: 15px; text-align: center; }
+
+    /* ===== Templates section header ===== */
+    .templates-header {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 12px;
+    }
+    .templates-title {
+      font-size: 11px; color: var(--muted);
+      text-transform: uppercase; letter-spacing: 0.6px; font-weight: 600;
+    }
+    .templates-edit {
+      font-size: 12px; color: var(--brand);
+      text-decoration: none; padding: 3px 6px; border-radius: 6px;
+      transition: background 0.15s;
+    }
+    .templates-edit:hover { background: var(--brand-light); }
+
+    /* ===== Column headers ===== */
+    .col-headers {
+      display: grid; grid-template-columns: 1fr 1fr;
+      gap: 8px; margin-bottom: 6px;
+    }
+    .col-label {
+      text-align: center; font-size: 11px; font-weight: 700;
+      letter-spacing: 0.8px; text-transform: uppercase; padding: 4px 0;
+      border-radius: 6px;
+    }
+    .col-label.in  { color: var(--in-text);  background: var(--in-bg);  }
+    .col-label.out { color: var(--out-text); background: var(--out-bg); }
+
+    /* ===== Pair rows ===== */
+    .pairs-grid {
+      display: flex; flex-direction: column; gap: 6px;
+    }
+    .pair-row {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 8px;
+      align-items: stretch;
+    }
+
+    /* ===== Individual chip ===== */
+    .tpl-chip {
+      display: flex; align-items: center; gap: 8px;
+      padding: 10px 12px;
+      border: 1.5px solid var(--border);
+      border-radius: 10px;
+      cursor: pointer;
+      background: var(--card);
+      transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+      min-width: 0;
+      user-select: none;
+    }
+    .tpl-chip:active { transform: scale(0.96); }
+
+    /* IN chip */
+    .tpl-chip.in {
+      border-color: var(--in-border);
+      background: var(--in-bg);
+    }
+    .tpl-chip.in:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 14px rgba(6, 193, 103, 0.22);
+      border-color: var(--good);
+    }
+
+    /* OUT chip */
+    .tpl-chip.out {
+      border-color: var(--out-border);
+      background: var(--out-bg);
+    }
+    .tpl-chip.out:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 14px rgba(255, 45, 85, 0.2);
+      border-color: var(--bad);
+    }
+
+    /* Direction dot */
+    .dir-dot {
+      width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+    }
+    .in  .dir-dot { background: var(--good); }
+    .out .dir-dot { background: var(--bad);  }
+
+    /* Chip emoji */
+    .tpl-chip .emoji { font-size: 17px; flex-shrink: 0; }
+
+    /* Chip text */
+    .tpl-chip .chip-label {
+      font-size: 13px; font-weight: 600;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      min-width: 0;
+    }
+    .tpl-chip.in  .chip-label { color: var(--in-text);  }
+    .tpl-chip.out .chip-label { color: var(--out-text); }
+
+    /* ===== Confirmed (flashed) state ===== */
+    .tpl-chip.confirmed {
+      animation: confirmPop 0.35s ease forwards;
+    }
+    @keyframes confirmPop {
+      0%   { transform: scale(1); }
+      40%  { transform: scale(1.06); }
+      100% { transform: scale(1); opacity: 0.7; }
+    }
+
+    /* ===== Unpaired chips row (bottom) ===== */
+    .unpaired-row {
+      display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px;
+      padding-top: 10px; border-top: 1px dashed var(--border);
+    }
+    .tpl-chip.solo {
+      border-color: var(--border);
+      background: var(--brand-light);
+    }
+    .tpl-chip.solo:hover {
+      border-color: var(--brand);
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(201,162,39,0.2);
+    }
+    .tpl-chip.solo .chip-label { color: var(--text); }
+
+    /* ===== Add button ===== */
+    .tpl-add {
+      padding: 10px 14px;
+      background: transparent;
+      border: 2px dashed var(--border);
+      border-radius: 10px;
+      cursor: pointer;
+      color: var(--muted);
+      font-size: 13px;
+      display: inline-flex; align-items: center; gap: 6px;
+      text-decoration: none;
+      transition: border-color 0.2s, color 0.2s;
+    }
+    .tpl-add:hover { border-color: var(--brand); color: var(--brand); }
+
+    /* ===== Toast ===== */
+    #toast {
+      position: fixed; left: 50%;
+      bottom: max(24px, calc(env(safe-area-inset-bottom) + 12px));
+      transform: translateX(-50%) translateY(20px);
+      background: #2c2c2c; color: #fff;
+      padding: 10px 16px; border-radius: 10px;
+      opacity: 0; pointer-events: none;
+      transition: opacity 0.25s, transform 0.25s;
+      z-index: 9999; font-size: 14px; white-space: nowrap;
+    }
+    [data-theme="dark"] #toast { background: #444; }
+    #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+    /* ===== Annotation badges (mock only) ===== */
+    .badge {
+      display: inline-block; font-size: 10px; font-weight: 700;
+      padding: 2px 7px; border-radius: 999px; vertical-align: middle;
+      margin-left: 6px; letter-spacing: 0.3px;
+    }
+    .badge.new { background: var(--brand); color: #fff; }
+
+    /* ===== Data model preview ===== */
+    details {
+      margin-top: 16px; border: 1px solid var(--border);
+      border-radius: 10px; overflow: hidden;
+    }
+    summary {
+      padding: 10px 14px; cursor: pointer; font-size: 13px;
+      font-weight: 600; color: var(--muted); background: var(--brand-light);
+      user-select: none;
+    }
+    summary:hover { color: var(--brand); }
+    pre {
+      margin: 0; padding: 14px; font-size: 12px; line-height: 1.6;
+      background: var(--card); overflow-x: auto; color: var(--text);
+    }
+
+    /* ===== Divider ===== */
+    .divider {
+      display: flex; align-items: center; gap: 12px;
+      margin: 16px 0; color: var(--muted); font-size: 12px;
+    }
+    .divider::before, .divider::after {
+      content: ''; flex: 1; height: 1px; background: var(--border);
+    }
+
+    /* ===== Mock manual form (grayed out) ===== */
+    .mock-form input, .mock-form select {
+      width: 100%; padding: 11px 12px; margin: 5px 0;
+      font-size: 15px; border: 1px solid var(--border);
+      border-radius: 10px; background: var(--brand-light);
+      color: var(--muted); pointer-events: none;
+    }
+    .mock-form .row { display: flex; gap: 8px; }
+    .mock-form .row > * { flex: 1; }
+    .mock-btn {
+      width: 100%; padding: 14px; margin-top: 8px;
+      background: var(--brand); color: #fff; border: none;
+      border-radius: 12px; font-size: 16px; font-weight: 700;
+      cursor: pointer; pointer-events: none; opacity: 0.6;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="page-header">
+    <h1>📥 Inserisci attività</h1>
+    <button class="theme-toggle" onclick="toggleTheme()">🌗 Tema</button>
+  </div>
+
+  <!-- ===== CARD: Quick Templates (new IN/OUT layout) ===== -->
+  <div class="card">
+
+    <div class="templates-header">
+      <span class="templates-title">⚡ Quick Templates <span class="badge new">NEW</span></span>
+      <a href="#" class="templates-edit">Modifica</a>
+    </div>
+
+    <!-- Column headers -->
+    <div class="col-headers">
+      <div class="col-label in">▶ IN</div>
+      <div class="col-label out">◀ OUT</div>
+    </div>
+
+    <!-- Paired rows (rendered by JS below) -->
+    <div class="pairs-grid" id="pairsGrid"></div>
+
+    <!-- Unpaired chips -->
+    <div class="unpaired-row" id="unpairedRow"></div>
+
+  </div>
+
+  <!-- ===== Manual entry (mock, non-interactive) ===== -->
+  <div class="divider">oppure inserisci manualmente</div>
+
+  <div class="card mock-form">
+    <input type="text" placeholder="Attività..." disabled>
+    <div class="row">
+      <input type="datetime-local" disabled>
+      <select disabled><option>-- Tag --</option></select>
+    </div>
+    <button class="mock-btn">➕ Aggiungi</button>
+  </div>
+
+  <!-- ===== Data model preview ===== -->
+  <details>
+    <summary>🗂 Option A — Data model (nuovo campo <code>direction</code> + <code>location</code>)</summary>
+    <pre id="dataPreview"></pre>
+  </details>
+
+  <!-- Toast -->
+  <div id="toast"></div>
+
+  <script>
+    /* =============================================
+       MOCK DATA — Option A data model
+       Each template has:
+         - direction: 'in' | 'out'
+         - location: string (used to auto-pair)
+         - emoji, name, tag (existing fields)
+    ============================================= */
+    const MOCK_TEMPLATES = [
+      { id: 't1', emoji: '🏠', name: 'Casa',    location: 'casa',    direction: 'in',  tag: 'Commute' },
+      { id: 't2', emoji: '🏠', name: 'Casa',    location: 'casa',    direction: 'out', tag: 'Commute' },
+      { id: 't3', emoji: '💼', name: 'Ufficio', location: 'ufficio', direction: 'in',  tag: 'Work'    },
+      { id: 't4', emoji: '💼', name: 'Ufficio', location: 'ufficio', direction: 'out', tag: 'Work'    },
+      { id: 't5', emoji: '🏋️', name: 'Palestra', location: 'gym',   direction: 'in',  tag: 'Sport'   },
+      { id: 't6', emoji: '🏋️', name: 'Palestra', location: 'gym',   direction: 'out', tag: 'Sport'   },
+      // Unpaired example (no matching counterpart)
+      { id: 't7', emoji: '🌅', name: 'Sveglia', location: null, direction: null, tag: 'Sleep' },
+    ];
+
+    /* =============================================
+       PAIRING LOGIC
+       Groups templates by location.
+       A pair = one 'in' + one 'out' for the same location.
+       Anything else goes to unpaired.
+    ============================================= */
+    function buildPairs(templates) {
+      const locationMap = {}; // location -> { in: tpl, out: tpl }
+
+      const unpaired = [];
+
+      templates.forEach(tpl => {
+        if (!tpl.location || !tpl.direction) {
+          unpaired.push(tpl);
+          return;
+        }
+        if (!locationMap[tpl.location]) {
+          locationMap[tpl.location] = { in: null, out: null };
+        }
+        locationMap[tpl.location][tpl.direction] = tpl;
+      });
+
+      const pairs = [];
+      Object.values(locationMap).forEach(pair => {
+        if (pair.in && pair.out) {
+          pairs.push(pair);
+        } else {
+          // Only one side exists → treat as unpaired
+          if (pair.in)  unpaired.push(pair.in);
+          if (pair.out) unpaired.push(pair.out);
+        }
+      });
+
+      return { pairs, unpaired };
+    }
+
+    /* =============================================
+       RENDER
+    ============================================= */
+    function render() {
+      const { pairs, unpaired } = buildPairs(MOCK_TEMPLATES);
+
+      const pairsGrid   = document.getElementById('pairsGrid');
+      const unpairedRow = document.getElementById('unpairedRow');
+      pairsGrid.innerHTML   = '';
+      unpairedRow.innerHTML = '';
+
+      // Paired rows
+      pairs.forEach(pair => {
+        const row = document.createElement('div');
+        row.className = 'pair-row';
+        row.appendChild(makeChip(pair.in,  'in'));
+        row.appendChild(makeChip(pair.out, 'out'));
+        pairsGrid.appendChild(row);
+      });
+
+      // Unpaired chips
+      if (unpaired.length > 0) {
+        unpaired.forEach(tpl => {
+          unpairedRow.appendChild(makeChip(tpl, 'solo'));
+        });
+      }
+
+      // "+ Add" button inside unpaired row
+      const addBtn = document.createElement('a');
+      addBtn.href = '#';
+      addBtn.className = 'tpl-add';
+      addBtn.innerHTML = '<span>+</span> Aggiungi';
+      addBtn.onclick = (e) => { e.preventDefault(); showToast('⚙️ Apri Impostazioni → Templates'); };
+      unpairedRow.appendChild(addBtn);
+    }
+
+    function makeChip(tpl, type) {
+      const chip = document.createElement('div');
+      chip.className = `tpl-chip ${type}`;
+      chip.innerHTML = `
+        <span class="dir-dot"></span>
+        <span class="emoji">${tpl.emoji || '📌'}</span>
+        <span class="chip-label">${tpl.name}</span>
+      `;
+      chip.title = `Tag: ${tpl.tag}`;
+      chip.onclick = () => handleTap(chip, tpl, type);
+      return chip;
+    }
+
+    /* =============================================
+       INTERACTION — mock tap feedback
+    ============================================= */
+    let toastTimer = null;
+
+    function handleTap(chip, tpl, type) {
+      chip.classList.add('confirmed');
+      setTimeout(() => chip.classList.remove('confirmed'), 400);
+
+      const dirLabel = type === 'in' ? '▶ IN' : (type === 'out' ? '◀ OUT' : '');
+      const label = dirLabel ? `${dirLabel} — ${tpl.name}` : tpl.name;
+      showToast(`✅ "${label}" aggiunto! (mock)`);
+    }
+
+    function showToast(msg) {
+      const t = document.getElementById('toast');
+      t.textContent = msg;
+      t.classList.add('show');
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => t.classList.remove('show'), 2200);
+    }
+
+    /* =============================================
+       DATA MODEL PREVIEW
+    ============================================= */
+    document.getElementById('dataPreview').textContent =
+      JSON.stringify(MOCK_TEMPLATES, null, 2);
+
+    /* =============================================
+       THEME TOGGLE
+    ============================================= */
+    function toggleTheme() {
+      const current = document.documentElement.getAttribute('data-theme');
+      const next = current === 'dark' ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', next);
+      localStorage.setItem('tt_theme', next);
+    }
+
+    /* ===== Init ===== */
+    render();
+  </script>
+</body>
+</html>

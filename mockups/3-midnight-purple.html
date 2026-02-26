@@ -1,0 +1,317 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8" />
+  <title>Mockup 3: Midnight Purple</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    /* ===== BRAND: Midnight Purple (Glassmorphism) ===== */
+    :root {
+      --brand: #8b5cf6;
+      --brand-light: #ede9fe;
+      --brand-dark: #7c3aed;
+      --accent: #a78bfa;
+      --accent2: #c4b5fd;
+      --glow: rgba(139, 92, 246, 0.5);
+
+      --bg: #f5f3ff;
+      --text: #1e1b4b;
+      --muted: #6b7280;
+      --card: rgba(255, 255, 255, 0.7);
+      --border: rgba(139, 92, 246, 0.2);
+      --toast: #1e1b4b;
+      --toastText: #fff;
+    }
+
+    [data-theme="dark"] {
+      --bg: #0f0a1f;
+      --text: #e9e4ff;
+      --muted: #9ca3af;
+      --card: rgba(30, 27, 75, 0.6);
+      --border: rgba(139, 92, 246, 0.3);
+      --brand-light: rgba(139, 92, 246, 0.2);
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; padding: 20px;
+      font-family: system-ui, -apple-system, sans-serif;
+      color: var(--text);
+      min-height: 100vh;
+      background: var(--bg);
+      position: relative;
+    }
+    /* Gradient orbs background */
+    body::before, body::after {
+      content: '';
+      position: fixed;
+      border-radius: 50%;
+      filter: blur(80px);
+      z-index: -1;
+      opacity: 0.5;
+    }
+    body::before {
+      width: 400px; height: 400px;
+      background: var(--brand);
+      top: -100px; left: -100px;
+    }
+    body::after {
+      width: 300px; height: 300px;
+      background: var(--accent);
+      bottom: -50px; right: -50px;
+    }
+
+    .container { max-width: 500px; margin: 0 auto; position: relative; z-index: 1; }
+
+    .badge {
+      display: inline-block;
+      background: var(--brand);
+      color: white;
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+      margin-bottom: 16px;
+      box-shadow: 0 4px 15px var(--glow);
+    }
+
+    /* GLASSMORPHISM CARD */
+    .card {
+      background: var(--card);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid var(--border);
+      border-radius: 24px;
+      padding: 28px;
+      box-shadow: 0 8px 32px rgba(139, 92, 246, 0.15);
+    }
+
+    h3 {
+      margin: 0 0 24px;
+      font-size: 22px;
+      text-align: center;
+      font-weight: 700;
+    }
+
+    input, select {
+      width: 100%;
+      padding: 14px 18px;
+      font-size: 16px;
+      border: 2px solid var(--border);
+      border-radius: 16px;
+      background: rgba(255, 255, 255, 0.5);
+      color: var(--text);
+      margin-bottom: 12px;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      backdrop-filter: blur(8px);
+    }
+    [data-theme="dark"] input,
+    [data-theme="dark"] select {
+      background: rgba(30, 27, 75, 0.5);
+    }
+    input:focus, select:focus {
+      outline: none;
+      border-color: var(--brand);
+      box-shadow: 0 0 0 4px var(--brand-light), 0 0 20px var(--glow);
+    }
+
+    .row { display: flex; gap: 12px; }
+    .row > * { flex: 1; }
+
+    /* ===== TIME REMAINING (Glass style with glow) ===== */
+    .time-remaining {
+      background: linear-gradient(135deg, var(--brand-light), rgba(167, 139, 250, 0.2));
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 20px;
+      margin-bottom: 20px;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
+    .time-remaining::before {
+      content: '';
+      position: absolute;
+      top: -50%; left: -50%;
+      width: 200%; height: 200%;
+      background: conic-gradient(from 0deg, transparent, var(--accent2), transparent 30%);
+      animation: rotate 8s linear infinite;
+      opacity: 0.3;
+    }
+    @keyframes rotate {
+      100% { transform: rotate(360deg); }
+    }
+    .time-remaining > * { position: relative; z-index: 1; }
+    .time-remaining .icon {
+      font-size: 28px;
+      margin-bottom: 4px;
+      animation: pulse 2s ease-in-out infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.7; transform: scale(1.05); }
+    }
+    .time-remaining .label {
+      font-size: 12px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 4px;
+    }
+    .time-remaining .time {
+      font-size: 36px;
+      font-weight: 800;
+      color: var(--brand);
+      text-shadow: 0 0 20px var(--glow);
+      margin-bottom: 12px;
+    }
+    .progress-bar {
+      height: 10px;
+      background: rgba(139, 92, 246, 0.2);
+      border-radius: 99px;
+      overflow: hidden;
+    }
+    .progress-bar .fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--brand-dark), var(--brand), var(--accent));
+      border-radius: 99px;
+      transition: width 0.5s ease;
+      box-shadow: 0 0 15px var(--glow);
+    }
+    .time-remaining .percent {
+      font-size: 13px;
+      color: var(--brand-dark);
+      margin-top: 10px;
+      font-weight: 500;
+    }
+
+    /* ===== ADD BUTTON (Neon glow) ===== */
+    .addBtn {
+      width: 100%;
+      padding: 18px;
+      font-size: 18px;
+      font-weight: 700;
+      border: none;
+      border-radius: 16px;
+      background: linear-gradient(135deg, var(--brand-dark), var(--brand));
+      color: white;
+      cursor: pointer;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      box-shadow: 0 4px 20px var(--glow);
+      position: relative;
+    }
+    .addBtn:hover {
+      transform: translateY(-3px) scale(1.02);
+      box-shadow: 0 8px 30px var(--glow), 0 0 40px var(--glow);
+    }
+    .addBtn:active {
+      transform: translateY(-1px) scale(1);
+    }
+
+    /* ===== STATS BUTTON ===== */
+    .statsBtn {
+      width: 100%;
+      padding: 14px;
+      margin-top: 16px;
+      font-size: 16px;
+      font-weight: 600;
+      border: 2px solid var(--brand);
+      border-radius: 16px;
+      background: transparent;
+      color: var(--brand);
+      cursor: pointer;
+      transition: all 0.3s;
+      backdrop-filter: blur(8px);
+    }
+    .statsBtn:hover {
+      background: var(--brand);
+      color: white;
+      box-shadow: 0 4px 20px var(--glow);
+    }
+
+    .muted { color: var(--muted); font-size: 13px; text-align: center; margin-top: 14px; }
+
+    /* Theme toggle */
+    .theme-toggle {
+      position: fixed;
+      top: 12px;
+      right: 12px;
+      background: var(--card);
+      backdrop-filter: blur(10px);
+      border: 1px solid var(--border);
+      border-radius: 99px;
+      padding: 8px 12px;
+      cursor: pointer;
+      font-size: 14px;
+      color: var(--text);
+    }
+  </style>
+</head>
+<body>
+  <button class="theme-toggle" onclick="document.documentElement.dataset.theme = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark'">
+    Toggle Dark
+  </button>
+
+  <div class="container">
+    <div class="badge">MOCKUP 3: MIDNIGHT PURPLE</div>
+
+    <div class="card">
+      <h3>Inserisci attivita</h3>
+
+      <input type="text" placeholder="Cosa stai facendo...">
+
+      <div class="row">
+        <input type="datetime-local" value="2026-02-03T16:30">
+        <select>
+          <option>--Tag--</option>
+          <option>Lavoro</option>
+          <option>Studio</option>
+          <option>Sport</option>
+        </select>
+      </div>
+
+      <!-- TIME REMAINING -->
+      <div class="time-remaining">
+        <div class="icon">⏳</div>
+        <div class="label">Tempo rimanente oggi</div>
+        <div class="time" id="timeLeft">7h 28m</div>
+        <div class="progress-bar">
+          <div class="fill" id="progressFill" style="width: 69%"></div>
+        </div>
+        <div class="percent" id="percentText">31% rimanente</div>
+      </div>
+
+      <button class="addBtn">Aggiungi</button>
+
+      <p class="muted">Ultimo: Studio - 15:30</p>
+    </div>
+
+    <button class="statsBtn">Statistiche</button>
+  </div>
+
+  <script>
+    function updateTime() {
+      const now = new Date();
+      const endOfDay = new Date(now);
+      endOfDay.setHours(23, 59, 59, 999);
+
+      const remaining = endOfDay - now;
+      const hours = Math.floor(remaining / (1000 * 60 * 60));
+      const minutes = Math.floor((remaining % (1000 * 60 * 60)) / (1000 * 60));
+
+      const startOfDay = new Date(now);
+      startOfDay.setHours(0, 0, 0, 0);
+      const totalDay = 24 * 60 * 60 * 1000;
+      const elapsed = now - startOfDay;
+      const percent = Math.round((elapsed / totalDay) * 100);
+      const remainingPercent = 100 - percent;
+
+      document.getElementById('timeLeft').textContent = `${hours}h ${minutes}m`;
+      document.getElementById('progressFill').style.width = percent + '%';
+      document.getElementById('percentText').textContent = `${remainingPercent}% rimanente`;
+    }
+    updateTime();
+    setInterval(updateTime, 60000);
+  </script>
+</body>
+</html>

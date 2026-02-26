@@ -1,0 +1,260 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8" />
+  <title>Mockup 1: Ocean Blue</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    /* ===== BRAND: Ocean Blue ===== */
+    :root {
+      --brand: #0066ff;
+      --brand-light: #e6f0ff;
+      --brand-dark: #0052cc;
+      --accent: #00c2ff;
+
+      --bg: #f8fafc;
+      --text: #1a1a2e;
+      --muted: #64748b;
+      --card: #ffffff;
+      --border: #e2e8f0;
+      --toast: #1a1a2e;
+      --toastText: #fff;
+    }
+
+    [data-theme="dark"] {
+      --bg: #0f172a;
+      --text: #f1f5f9;
+      --muted: #94a3b8;
+      --card: #1e293b;
+      --border: #334155;
+      --brand-light: #1e3a5f;
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; padding: 20px;
+      font-family: system-ui, -apple-system, sans-serif;
+      background: var(--bg); color: var(--text);
+      min-height: 100vh;
+    }
+
+    .container { max-width: 500px; margin: 0 auto; }
+
+    .badge {
+      display: inline-block;
+      background: var(--brand);
+      color: white;
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+      margin-bottom: 16px;
+    }
+
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 24px;
+      box-shadow: 0 4px 20px rgba(0, 102, 255, 0.08);
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+    .card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 30px rgba(0, 102, 255, 0.12);
+    }
+
+    h3 {
+      margin: 0 0 20px;
+      font-size: 20px;
+      text-align: center;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    input, select {
+      width: 100%;
+      padding: 14px 16px;
+      font-size: 16px;
+      border: 2px solid var(--border);
+      border-radius: 12px;
+      background: var(--bg);
+      color: var(--text);
+      margin-bottom: 12px;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    input:focus, select:focus {
+      outline: none;
+      border-color: var(--brand);
+      box-shadow: 0 0 0 4px var(--brand-light);
+    }
+
+    .row { display: flex; gap: 12px; }
+    .row > * { flex: 1; }
+
+    /* ===== TIME REMAINING BAR ===== */
+    .time-remaining {
+      background: var(--brand-light);
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 16px;
+      text-align: center;
+    }
+    .time-remaining .label {
+      font-size: 14px;
+      color: var(--muted);
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+    }
+    .time-remaining .time {
+      font-size: 24px;
+      font-weight: 700;
+      color: var(--brand);
+      margin-bottom: 10px;
+    }
+    .progress-bar {
+      height: 8px;
+      background: var(--border);
+      border-radius: 99px;
+      overflow: hidden;
+    }
+    .progress-bar .fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--brand), var(--accent));
+      border-radius: 99px;
+      transition: width 0.5s ease;
+    }
+    .time-remaining .percent {
+      font-size: 12px;
+      color: var(--muted);
+      margin-top: 6px;
+    }
+
+    /* ===== ADD BUTTON ===== */
+    .addBtn {
+      width: 100%;
+      padding: 16px;
+      font-size: 18px;
+      font-weight: 700;
+      border: none;
+      border-radius: 12px;
+      background: linear-gradient(135deg, var(--brand), var(--brand-dark));
+      color: white;
+      cursor: pointer;
+      transition: transform 0.15s, box-shadow 0.15s;
+      box-shadow: 0 4px 15px rgba(0, 102, 255, 0.3);
+    }
+    .addBtn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(0, 102, 255, 0.4);
+    }
+    .addBtn:active {
+      transform: translateY(0);
+    }
+
+    /* ===== STATS BUTTON ===== */
+    .statsBtn {
+      width: 100%;
+      padding: 14px;
+      margin-top: 16px;
+      font-size: 16px;
+      font-weight: 600;
+      border: 2px solid var(--brand);
+      border-radius: 12px;
+      background: transparent;
+      color: var(--brand);
+      cursor: pointer;
+      transition: background 0.2s, color 0.2s;
+    }
+    .statsBtn:hover {
+      background: var(--brand);
+      color: white;
+    }
+
+    .muted { color: var(--muted); font-size: 13px; text-align: center; margin-top: 12px; }
+
+    /* Theme toggle */
+    .theme-toggle {
+      position: fixed;
+      top: 12px;
+      right: 12px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 99px;
+      padding: 8px 12px;
+      cursor: pointer;
+      font-size: 14px;
+    }
+  </style>
+</head>
+<body>
+  <button class="theme-toggle" onclick="document.documentElement.dataset.theme = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark'">
+    Toggle Dark
+  </button>
+
+  <div class="container">
+    <div class="badge">MOCKUP 1: OCEAN BLUE</div>
+
+    <div class="card">
+      <h3>Inserisci attivita</h3>
+
+      <input type="text" placeholder="Cosa stai facendo...">
+
+      <div class="row">
+        <input type="datetime-local" value="2026-02-03T16:30">
+        <select>
+          <option>--Tag--</option>
+          <option>Lavoro</option>
+          <option>Studio</option>
+          <option>Sport</option>
+        </select>
+      </div>
+
+      <!-- TIME REMAINING -->
+      <div class="time-remaining">
+        <div class="label">Tempo rimanente oggi</div>
+        <div class="time" id="timeLeft">7h 28m</div>
+        <div class="progress-bar">
+          <div class="fill" id="progressFill" style="width: 69%"></div>
+        </div>
+        <div class="percent" id="percentText">69% della giornata trascorso</div>
+      </div>
+
+      <button class="addBtn">Aggiungi</button>
+
+      <p class="muted">Ultimo: Studio alle 15:30</p>
+    </div>
+
+    <button class="statsBtn">Vai alle statistiche</button>
+  </div>
+
+  <script>
+    function updateTime() {
+      const now = new Date();
+      const endOfDay = new Date(now);
+      endOfDay.setHours(23, 59, 59, 999);
+
+      const remaining = endOfDay - now;
+      const hours = Math.floor(remaining / (1000 * 60 * 60));
+      const minutes = Math.floor((remaining % (1000 * 60 * 60)) / (1000 * 60));
+
+      const startOfDay = new Date(now);
+      startOfDay.setHours(0, 0, 0, 0);
+      const totalDay = 24 * 60 * 60 * 1000;
+      const elapsed = now - startOfDay;
+      const percent = Math.round((elapsed / totalDay) * 100);
+
+      document.getElementById('timeLeft').textContent = `${hours}h ${minutes}m`;
+      document.getElementById('progressFill').style.width = percent + '%';
+      document.getElementById('percentText').textContent = `${percent}% della giornata trascorso`;
+    }
+    updateTime();
+    setInterval(updateTime, 60000);
+  </script>
+</body>
+</html>

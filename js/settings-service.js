@@ -7,7 +7,12 @@
 
 /* ===== Default Templates ===== */
 const DEFAULT_TEMPLATES = [
-  { id: 't1', emoji: '🌅', name: 'Wake', tag: 'Sleep' }
+  { id: 't1', emoji: '🏠', name: 'Casa',     location: 'casa',    direction: 'in',  tag: 'Survive'  },
+  { id: 't2', emoji: '🏠', name: 'Casa',     location: 'casa',    direction: 'out', tag: 'Survive'  },
+  { id: 't3', emoji: '💼', name: 'Ufficio',  location: 'ufficio', direction: 'in',  tag: 'Survive'  },
+  { id: 't4', emoji: '💼', name: 'Ufficio',  location: 'ufficio', direction: 'out', tag: 'Work'     },
+  { id: 't5', emoji: '🏋️', name: 'Palestra', location: null,      direction: null,  tag: 'Exercise' },
+  { id: 't6', emoji: '🌅', name: 'Sveglia',  location: null,      direction: null,  tag: 'Sleep'    }
 ];
 
 /* ===== Default Tags ===== */
@@ -266,7 +271,7 @@ function getTemplates(settings = cachedSettings) {
  * @returns {Promise<Object>} Updated settings
  */
 async function addTemplate(uid, template) {
-  const { emoji, name, tag } = template;
+  const { emoji, name, tag, direction = null, location = null } = template;
   if (!name?.trim()) throw new Error('Nome template richiesto');
   if (!tag?.trim()) throw new Error('Tag richiesto');
 
@@ -275,7 +280,9 @@ async function addTemplate(uid, template) {
     id: 't' + Date.now(),
     emoji: emoji || '📌',
     name: name.trim(),
-    tag: tag.trim()
+    tag: tag.trim(),
+    direction: direction || null,   // 'in' | 'out' | null
+    location: location?.trim() || null // e.g. 'casa', 'ufficio' — used for pairing
   };
 
   const updated = [...current, newTemplate];

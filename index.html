@@ -222,9 +222,7 @@
     }
 
     /* ===== Quick Templates ===== */
-    .templates-section{
-      margin-bottom:16px;
-    }
+    .templates-section{ margin-bottom:16px; }
     .templates-header{
       display:flex; align-items:center; justify-content:space-between;
       margin-bottom:10px;
@@ -236,42 +234,126 @@
     .templates-edit{
       font-size:12px; color:var(--brand);
       cursor:pointer; border:none; background:none; padding:4px 8px;
+      text-decoration:none;
     }
     .templates-edit:hover{ text-decoration:underline; }
-    .templates-grid{
-      display:flex; flex-wrap:wrap; gap:8px;
+
+    /* Column headers */
+    .tpl-col-headers{
+      display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:6px;
     }
+    .tpl-col-label{
+      text-align:center; font-size:11px; font-weight:700;
+      letter-spacing:0.7px; text-transform:uppercase;
+      padding:4px 0; border-radius:6px;
+    }
+    .tpl-col-label.in {
+      color:#057a45; background:#edfaf3;
+    }
+    .tpl-col-label.out{
+      color:#cc1a3a; background:#fff0f3;
+    }
+    [data-theme="dark"] .tpl-col-label.in {
+      color:#22d47b; background:#0d2a1e;
+    }
+    [data-theme="dark"] .tpl-col-label.out{
+      color:#ff4d6d; background:#2a0f15;
+    }
+
+    /* Paired grid */
+    .tpl-pairs-grid{ display:flex; flex-direction:column; gap:6px; }
+    .tpl-pair-row{
+      display:grid; grid-template-columns:1fr 1fr; gap:8px; align-items:stretch;
+    }
+
+    /* Chip base */
     .template-chip{
-      display:flex; align-items:center; gap:8px;
-      padding:10px 14px;
-      background:var(--brand-light);
-      border:1px solid var(--border);
+      display:flex; align-items:center; gap:7px;
+      padding:10px 12px;
+      border:1.5px solid var(--border);
       border-radius:10px;
       cursor:pointer;
-      transition:all 0.2s ease;
+      background:var(--card);
+      transition:transform 0.15s ease, box-shadow 0.15s ease,
+                 border-color 0.15s ease, background 0.15s ease;
       min-width:0;
+      user-select:none;
     }
-    .template-chip:hover{
+    .template-chip:active{ transform:scale(0.96); }
+
+    /* IN chip */
+    .template-chip.in{
+      border-color:#06c167; background:#edfaf3;
+    }
+    .template-chip.in:hover{
+      transform:translateY(-2px);
+      box-shadow:0 4px 14px rgba(6,193,103,0.22);
+    }
+    [data-theme="dark"] .template-chip.in{
+      border-color:#22d47b; background:#0d2a1e;
+    }
+
+    /* OUT chip */
+    .template-chip.out{
+      border-color:#ff2d55; background:#fff0f3;
+    }
+    .template-chip.out:hover{
+      transform:translateY(-2px);
+      box-shadow:0 4px 14px rgba(255,45,85,0.2);
+    }
+    [data-theme="dark"] .template-chip.out{
+      border-color:#ff4d6d; background:#2a0f15;
+    }
+
+    /* Solo (unpaired) chip */
+    .template-chip.solo{
+      border-color:var(--border); background:var(--brand-light);
+    }
+    .template-chip.solo:hover{
       border-color:var(--brand);
       transform:translateY(-2px);
       box-shadow:0 4px 12px rgba(201,162,39,0.2);
     }
-    .template-chip:active{ transform:scale(0.97); }
-    .template-chip .emoji{ font-size:18px; flex-shrink:0; }
-    .template-chip .info{ min-width:0; overflow:hidden; }
+
+    /* Direction dot */
+    .tpl-dot{
+      width:7px; height:7px; border-radius:50%; flex-shrink:0;
+    }
+    .template-chip.in  .tpl-dot{ background:#06c167; }
+    .template-chip.out .tpl-dot{ background:#ff2d55; }
+    [data-theme="dark"] .template-chip.in  .tpl-dot{ background:#22d47b; }
+    [data-theme="dark"] .template-chip.out .tpl-dot{ background:#ff4d6d; }
+
+    .template-chip .emoji{ font-size:17px; flex-shrink:0; }
     .template-chip .tpl-name{
       font-weight:600; font-size:13px;
       white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+      min-width:0;
     }
-    .template-chip .tpl-tag{ font-size:11px; color:var(--muted); }
+    .template-chip.in  .tpl-name{ color:#057a45; }
+    .template-chip.out .tpl-name{ color:#cc1a3a; }
+    .template-chip.solo .tpl-name{ color:var(--text); }
+    [data-theme="dark"] .template-chip.in  .tpl-name{ color:#22d47b; }
+    [data-theme="dark"] .template-chip.out .tpl-name{ color:#ff4d6d; }
+
+    /* Added (confirmed) state */
     .template-chip.added{
-      background:#e9fff4; border-color:#06c167;
+      animation: tplConfirm 0.35s ease forwards;
     }
-    [data-theme="dark"] .template-chip.added{
-      background:#0d2a1e; border-color:#22d47b;
+    @keyframes tplConfirm {
+      0%   { transform:scale(1); }
+      40%  { transform:scale(1.05); }
+      100% { transform:scale(1); }
     }
-    .template-chip.added .tpl-name{ color:#06c167; }
-    [data-theme="dark"] .template-chip.added .tpl-name{ color:#22d47b; }
+
+    /* Unpaired row */
+    .tpl-unpaired-row{
+      display:flex; flex-wrap:wrap; gap:8px;
+      margin-top:10px; padding-top:10px;
+      border-top:1px dashed var(--border);
+    }
+
+    /* Add button */
     .template-add{
       padding:10px 14px;
       background:transparent;
@@ -280,12 +362,11 @@
       cursor:pointer;
       color:var(--muted);
       font-size:13px;
-      display:flex; align-items:center; gap:6px;
-      transition:all 0.2s ease;
+      display:inline-flex; align-items:center; gap:6px;
+      text-decoration:none;
+      transition:border-color 0.2s, color 0.2s;
     }
-    .template-add:hover{
-      border-color:var(--brand); color:var(--brand);
-    }
+    .template-add:hover{ border-color:var(--brand); color:var(--brand); }
     .divider{
       display:flex; align-items:center; gap:12px;
       margin:16px 0; color:var(--muted); font-size:12px;
@@ -351,9 +432,15 @@
             <span class="templates-title">⚡ Quick Templates</span>
             <a href="pages/settings.html#templates" class="templates-edit">Modifica</a>
           </div>
-          <div class="templates-grid" id="templatesGrid">
-            <!-- Templates loaded dynamically -->
+          <!-- IN / OUT column headers (shown only when there are pairs) -->
+          <div class="tpl-col-headers hidden" id="tplColHeaders">
+            <div class="tpl-col-label in">▶ IN</div>
+            <div class="tpl-col-label out">◀ OUT</div>
           </div>
+          <!-- Paired rows -->
+          <div class="tpl-pairs-grid" id="tplPairsGrid"></div>
+          <!-- Unpaired / solo chips -->
+          <div class="tpl-unpaired-row hidden" id="tplUnpairedRow"></div>
         </div>
 
         <div class="divider">oppure inserisci manualmente</div>
@@ -537,33 +624,97 @@
     }
 
     /* ===== Quick Templates ===== */
-    function renderTemplates() {
-      const grid = $('#templatesGrid');
-      const templates = SettingsService.getTemplates();
 
-      grid.innerHTML = '';
+    /**
+     * Split templates into IN/OUT pairs (matched by location) and unpaired solos.
+     */
+    function buildTemplatePairs(templates) {
+      const locationMap = {};
+      const unpaired = [];
 
       templates.forEach(tpl => {
-        const chip = document.createElement('div');
-        chip.className = 'template-chip';
-        chip.dataset.id = tpl.id;
-        chip.innerHTML = `
-          <span class="emoji">${escapeHtml(tpl.emoji || '📌')}</span>
-          <div class="info">
-            <div class="tpl-name">${escapeHtml(tpl.name)}</div>
-            <div class="tpl-tag">${escapeHtml(tpl.tag)}</div>
-          </div>
-        `;
-        chip.onclick = () => quickAddTemplate(chip, tpl);
-        grid.appendChild(chip);
+        if (!tpl.location || !tpl.direction) {
+          unpaired.push(tpl);
+          return;
+        }
+        if (!locationMap[tpl.location]) locationMap[tpl.location] = { in: null, out: null };
+        locationMap[tpl.location][tpl.direction] = tpl;
       });
 
-      // Add "+" button
+      const pairs = [];
+      Object.values(locationMap).forEach(pair => {
+        if (pair.in && pair.out) {
+          pairs.push(pair);
+        } else {
+          if (pair.in)  unpaired.push(pair.in);
+          if (pair.out) unpaired.push(pair.out);
+        }
+      });
+
+      return { pairs, unpaired };
+    }
+
+    function makeTemplateChip(tpl, type) {
+      const chip = document.createElement('div');
+      chip.className = `template-chip ${type}`;
+      chip.dataset.id = tpl.id;
+      chip.title = `Tag: ${escapeHtml(tpl.tag)}`;
+
+      const dotHtml = (type !== 'solo')
+        ? `<span class="tpl-dot"></span>`
+        : '';
+
+      chip.innerHTML = `
+        ${dotHtml}
+        <span class="emoji">${escapeHtml(tpl.emoji || '📌')}</span>
+        <span class="tpl-name">${escapeHtml(tpl.name)}</span>
+      `;
+      chip.onclick = () => quickAddTemplate(chip, tpl);
+      return chip;
+    }
+
+    function renderTemplates() {
+      const pairsGrid   = $('#tplPairsGrid');
+      const unpairedRow = $('#tplUnpairedRow');
+      const colHeaders  = $('#tplColHeaders');
+      const templates   = SettingsService.getTemplates();
+
+      pairsGrid.innerHTML   = '';
+      unpairedRow.innerHTML = '';
+
+      const { pairs, unpaired } = buildTemplatePairs(templates);
+
+      // Paired rows
+      if (pairs.length > 0) {
+        colHeaders.classList.remove('hidden');
+        pairs.forEach(pair => {
+          const row = document.createElement('div');
+          row.className = 'tpl-pair-row';
+          row.appendChild(makeTemplateChip(pair.in,  'in'));
+          row.appendChild(makeTemplateChip(pair.out, 'out'));
+          pairsGrid.appendChild(row);
+        });
+      } else {
+        colHeaders.classList.add('hidden');
+      }
+
+      // Unpaired / solo chips
+      if (unpaired.length > 0) {
+        unpairedRow.classList.remove('hidden');
+        unpaired.forEach(tpl => {
+          unpairedRow.appendChild(makeTemplateChip(tpl, 'solo'));
+        });
+      } else {
+        unpairedRow.classList.add('hidden');
+      }
+
+      // "+ Aggiungi" button always in unpaired row
+      unpairedRow.classList.remove('hidden');
       const addBtn = document.createElement('a');
       addBtn.href = 'pages/settings.html#templates';
       addBtn.className = 'template-add';
       addBtn.innerHTML = '<span>+</span> Aggiungi';
-      grid.appendChild(addBtn);
+      unpairedRow.appendChild(addBtn);
     }
 
     async function quickAddTemplate(chip, template) {
